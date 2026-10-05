@@ -14,7 +14,9 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { ToolError, cleanEnv } = require('./meli');
-const { todosOsProdutos } = require('./mineracao');
+const { esc, preco, url } = require('./html');
+const { calcularIndicadores, selecionarParaAccio } = require('./indicadores');
+const { painelHtml } = require('./painel');
 
 function pastaMineracoes() {
   return cleanEnv(process.env.CONECTA_HUB_SAIDA) || path.join(os.homedir(), 'ConectaHubSourcing', 'mineracoes');
@@ -36,23 +38,6 @@ function gravar(arquivo, conteudo) {
 /* ------------------------------------------------------------------ */
 /* Catalogo em HTML                                                    */
 /* ------------------------------------------------------------------ */
-
-function esc(v) {
-  return String(v === undefined || v === null ? '' : v)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-// So aceita enderecos http(s) em src e href, para o HTML nao executar nada
-// que venha da API.
-function url(v) {
-  return typeof v === 'string' && /^https?:\/\//.test(v) ? esc(v) : '';
-}
-
-function preco(valor, moeda) {
-  if (typeof valor !== 'number') return '';
-  const n = valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return `${moeda === 'BRL' || !moeda ? 'R$' : esc(moeda)} ${n}`;
-}
 
 function cartaoProduto(p) {
   const an = p.anuncios || {};
@@ -146,9 +131,38 @@ function salvarMineracao(m) {
   const id = `${carimbo(m.consultado_em)}-${m.categoria_raiz.id}`;
   const pasta = path.join(pastaMineracoes(), id);
   m.id = id;
+  const indicadores = calcularIndicadores(m, mineracaoAnterior(m));
   gravar(path.join(pasta, 'mineracao.json'), JSON.stringify(m, null, 2));
   gravar(path.join(pasta, 'catalogo.html'), catalogoHtml(m));
-  return { id, pasta, catalogo: path.join(pasta, 'catalogo.html'), dados: path.join(pasta, 'mineracao.json') };
+  gravar(path.join(pasta, 'painel.html'), painelHtml(m, indicadores));
+  return {
+    id,
+    pasta,
+    painel: path.join(pasta, 'painel.html'),
+    catalogo: path.join(pasta, 'catalogo.html'),
+    dados: path.join(pasta, 'mineracao.json'),
+    indicadores,
+  };
+}
+
+// A mineracao mais recente da mesma categoria raiz, anterior a `m`.
+function mineracaoAnterior(m) {
+  const sufixo = `-${m.categoria_raiz.id}`;
+  const id = listarMineracoes().find((x) => x.endsWith(sufixo) && x < m.id);
+  if (!id) return null;
+  try {
+    return JSON.parse(fs.readFileSync(path.join(pastaMineracoes(), id, 'mineracao.json'), 'utf8'));
+  } catch (_) {
+    return null;
+  }
+}
+
+// Recalcula os indicadores de uma mineracao ja gravada e regrava o painel.
+function gerarPainel(m) {
+  const indicadores = calcularIndicadores(m, mineracaoAnterior(m));
+  const painel = path.join(pastaMineracoes(), m.id, 'painel.html');
+  gravar(painel, painelHtml(m, indicadores));
+  return { painel, indicadores };
 }
 
 function listarMineracoes() {
@@ -186,26 +200,6 @@ function resumirMineracoes() {
 /* ------------------------------------------------------------------ */
 /* Accio Work                                                          */
 /* ------------------------------------------------------------------ */
-
-function selecionarParaAccio(m, filtros) {
-  const f = filtros || {};
-  const incluirRegulados = f.incluir_regulados === true;
-  const incluirMarcas = f.incluir_marcas === true;
-  const limite = Number.isInteger(f.limite) && f.limite > 0 ? Math.min(f.limite, 100) : 20;
-  const descartados = { proibido: 0, regulado: 0, marca_registrada: 0, sem_detalhe: 0 };
-  const aceitos = [];
-  for (const p of todosOsProdutos(m)) {
-    if (!p.nome) { descartados.sem_detalhe += 1; continue; }
-    const reg = p.sinais.regulatorio;
-    // Produto proibido nunca segue para cotacao, independente do filtro.
-    if (reg.some((r) => r.orgao === 'Proibido')) { descartados.proibido += 1; continue; }
-    if (reg.length && !incluirRegulados) { descartados.regulado += 1; continue; }
-    if (!p.sinais.sem_marca && !incluirMarcas) { descartados.marca_registrada += 1; continue; }
-    aceitos.push(p);
-  }
-  aceitos.sort((a, b) => b.prioridade.pontos - a.prioridade.pontos || a.melhor_posicao - b.melhor_posicao);
-  return { produtos: aceitos.slice(0, limite), descartados, acima_do_limite: Math.max(0, aceitos.length - limite) };
-}
 
 function briefingAccio(m, produtos) {
   const linhas = [
@@ -295,6 +289,7 @@ module.exports = {
   carregarMineracao,
   catalogoHtml,
   enviarParaAccio,
+  gerarPainel,
   pastaAccio,
   pastaMineracoes,
   resumirMineracoes,

@@ -16,6 +16,7 @@ Roda como extensão do Claude Desktop (formato MCPB) e não tem dependências al
 | `anuncios_do_produto` | Anúncios de um produto, com preço e vendedor. |
 | `minerar_categoria` | Mineração por categoria (ver abaixo). |
 | `listar_mineracoes` | Minerações já gravadas neste computador. |
+| `painel_indicadores` | Indicadores, variação no ranking e sugestões de produto de uma mineração. |
 | `enviar_para_accio` | Envia os produtos de uma mineração para o Accio Work. |
 | `consulta_api` | Diagnóstico: resposta crua de um recurso de catálogo. |
 
@@ -34,6 +35,7 @@ As categorias saem com o nome e o caminho que o site usa (por exemplo `Celulares
 
 Cada mineração é gravada em `~/ConectaHubSourcing/mineracoes/<id>/`:
 
+- `painel.html`: painel de indicadores (ver abaixo);
 - `catalogo.html`: catálogo com fotos, agrupado por categoria, para abrir no navegador;
 - `mineracao.json`: o resultado completo.
 
@@ -52,6 +54,24 @@ A API do Mercado Livre informa a posição no ranking, nunca a quantidade vendid
 | Produto proibido | zera |
 
 Os alertas regulatórios vêm de palavras-chave no nome do produto e da categoria. Servem para chamar atenção; a exigência real depende do NCM.
+
+## Painel de indicadores
+
+O `painel.html` de cada mineração mostra:
+
+- os totais: produtos minerados, aptos para cotação, sem marca registrada, quantos batem com termo em alta e a faixa de menor preço;
+- quatro gráficos de contagem: triagem para cotação, produtos por categoria, faixas de menor preço e concorrência (anúncios por produto);
+- as sugestões de produto, com os motivos e as ressalvas de cada uma;
+- a variação no ranking em relação à mineração anterior da mesma categoria: quem subiu, desceu, entrou e saiu;
+- a tabela com todos os produtos.
+
+`painel_indicadores` devolve os mesmos números em JSON e regrava o painel.
+
+### Dados de venda
+
+A API não entrega quantidade vendida a esta aplicação. Com o token `client_credentials`, `/items` e `/sites/MLB/search` respondem 403, e os produtos de catálogo não trazem esse campo. O painel mostra qualquer campo de venda que a API devolver e, quando não vem nenhum, diz isso.
+
+O sinal de demanda disponível é a posição no ranking e a sua variação. Por isso vale minerar a mesma categoria de novo a cada semana: a comparação é o que mostra tendência.
 
 ## Envio para o Accio Work
 

@@ -177,3 +177,35 @@ test('grava o catalogo e envia ao Accio so o que passa nos filtros', async () =>
   assert.equal(amplo.produtos_enviados, 3, 'o proibido nunca segue');
   assert.throws(() => saida.carregarMineracao('../fora'), /nao encontrado/);
 });
+
+test('painel traz indicadores, sugestoes e a variacao entre mineracoes', async () => {
+  const primeira = await minerarCategoria('MLB1', {});
+  primeira.consultado_em = '2026-01-01T10:00:00.000Z';
+  saida.salvarMineracao(primeira);
+
+  // Na segunda leitura o organizador cai de 1º para 2º no ranking da raiz.
+  RANKINGS.MLB1[0].position = 2;
+  RANKINGS.MLB1[1].position = 1;
+  const segunda = await minerarCategoria('MLB1', {});
+  segunda.consultado_em = '2026-01-08T10:00:00.000Z';
+  const arq = saida.salvarMineracao(segunda);
+  const ind = arq.indicadores;
+
+  assert.deepEqual(ind.triagem, { apto: 1, marca_registrada: 1, regulado: 1, proibido: 1, sem_detalhe: 1 });
+  assert.equal(ind.totais.aptos_para_cotacao, 1);
+  assert.equal(ind.vendas.registros_com_campo_de_venda.length, 0);
+  assert.match(ind.vendas.observacao, /nao devolveu nenhum campo de vendas/);
+
+  assert.equal(ind.sugestoes[0].id, 'MLB100', 'o apto vem primeiro');
+  assert.ok(ind.sugestoes[0].motivos.includes('sem marca registrada'));
+  assert.ok(!ind.sugestoes.some((s) => s.id === 'MLB300'), 'proibido nunca e sugerido');
+  assert.match(ind.sugestoes.find((s) => s.id === 'MLB200').ressalvas[0], /marca registrada \(Xiaomi\)/);
+
+  assert.deepEqual(ind.variacao.subiram.map((x) => x.id), ['MLB200']);
+  assert.deepEqual(ind.variacao.desceram.map((x) => [x.id, x.posicao_anterior, x.posicao]), [['MLB100', 1, 2]]);
+
+  const html = fs.readFileSync(arq.painel, 'utf8');
+  assert.match(html, /Triagem para cotação/);
+  assert.match(html, /1º → 2º/);
+  assert.equal(saida.gerarPainel(saida.carregarMineracao(arq.id)).indicadores.variacao.mineracao_anterior, '20260101-100000-MLB1');
+});

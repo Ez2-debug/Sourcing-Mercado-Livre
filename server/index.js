@@ -23,10 +23,10 @@ const {
 } = require('./catalogo');
 const { LIMITES, minerarCategoria } = require('./mineracao');
 const {
-  carregarMineracao, enviarParaAccio, resumirMineracoes, salvarMineracao,
+  carregarMineracao, enviarParaAccio, gerarPainel, resumirMineracoes, salvarMineracao,
 } = require('./saida');
 
-const SERVER_VERSION = '0.4.1';
+const SERVER_VERSION = '0.5.0';
 const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
 /* ------------------------------------------------------------------ */
@@ -274,7 +274,8 @@ const TOOLS = [
       'Mineracao de produtos por categoria. Parte de uma categoria, desce pelas subcategorias, cruza o ranking de mais ' +
       'vendidos de cada uma com os termos em alta e com os anuncios de cada produto, e devolve os produtos agrupados pela ' +
       'categoria mais especifica em que aparecem, com o nome que o site usa, foto, menor preco, concorrencia, alertas ' +
-      'regulatorios e uma prioridade de triagem. Grava em disco o resultado completo e um catalogo HTML com fotos. ' +
+      'regulatorios, uma prioridade de triagem e sugestoes de produto. Grava em disco o resultado completo, um catalogo ' +
+      'HTML com fotos e um painel HTML de indicadores. ' +
       'Faz muitas chamadas a API e pode levar de um a tres minutos. Com enviar_para_accio=true ja entrega o pacote ao Accio Work.',
     inputSchema: {
       type: 'object',
@@ -307,7 +308,9 @@ const TOOLS = [
         categoria_raiz: m.categoria_raiz,
         consultado_em: m.consultado_em,
         resumo: m.resumo,
-        arquivos: { catalogo_html: arquivos.catalogo, dados_json: arquivos.dados },
+        arquivos: { painel_html: arquivos.painel, catalogo_html: arquivos.catalogo, dados_json: arquivos.dados },
+        sugestoes: arquivos.indicadores.sugestoes,
+        vendas: arquivos.indicadores.vendas.observacao,
         categorias: resumoDaMineracao(m, 8),
         aviso: AVISO_MINERACAO,
       };
@@ -329,6 +332,25 @@ const TOOLS = [
     async run() {
       const mineracoes = resumirMineracoes();
       return { total: mineracoes.length, mineracoes };
+    },
+  },
+  {
+    name: 'painel_indicadores',
+    description:
+      'Indicadores de uma mineracao ja gravada: triagem para cotacao, produtos por categoria, faixas de preco, concorrencia, ' +
+      'variacao de posicao em relacao a mineracao anterior da mesma categoria e sugestoes de produto com os motivos. ' +
+      'Regrava o painel HTML e devolve o caminho dele. Informa o que a API devolveu sobre vendas, sem estimar.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mineracao_id: { type: 'string', description: 'Opcional. Id devolvido por minerar_categoria; sem ele usa a mineracao mais recente.' },
+      },
+      additionalProperties: false,
+    },
+    async run(args) {
+      const m = carregarMineracao(args.mineracao_id);
+      const { painel, indicadores } = gerarPainel(m);
+      return { painel_html: painel, ...indicadores, aviso: AVISO_MINERACAO };
     },
   },
   {
@@ -384,7 +406,8 @@ const TOOLS = [
 
 const INSTRUCTIONS = [
   'Ferramentas de consulta ao Mercado Livre Brasil para apoiar sourcing e importacao (Conecta Hub).',
-  'Fluxo usual: listar_categorias -> detalhar_categoria -> minerar_categoria -> enviar_para_accio.',
+  'Fluxo usual: listar_categorias -> detalhar_categoria -> minerar_categoria -> painel_indicadores -> enviar_para_accio.',
+  'As sugestoes de produto vem com motivos e ressalvas; apresentar os dois. Minerar a mesma categoria de novo, dias depois, mostra quem subiu e quem desceu no ranking.',
   'Para uma consulta rapida: tendencias e mais_vendidos -> detalhar_produto -> anuncios_do_produto.',
   'Ao apresentar uma mineracao, agrupar por categoria com o nome exatamente como veio (campo categoria) e mostrar a foto de cada categoria e de cada produto.',
   'Sempre mostrar o link de cada produto ou anuncio citado. Links com link_montado=true foram montados pelo padrao do site e podem nao abrir.',

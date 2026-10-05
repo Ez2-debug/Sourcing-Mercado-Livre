@@ -15,7 +15,7 @@
 
 const { SITE, ToolError, apiGet, mapLimit } = require('./meli');
 const {
-  brandOf, dropEmpty, pathForProduct, photosOf, publicLink, summarizeListings,
+  brandOf, dropEmpty, findSalesFields, pathForProduct, photosOf, publicLink, summarizeListings,
 } = require('./catalogo');
 
 const LIMITES = {
@@ -192,6 +192,8 @@ async function detalharProduto(p) {
     return;
   }
   cru = cru || {};
+  // Guarda qualquer campo de vendas que a API mandar, sem interpretar.
+  const vendas = findSalesFields(cru);
   const fotos = photosOf(cru, 4);
   Object.assign(p, dropEmpty({
     nome: cru.name || cru.title,
@@ -208,12 +210,16 @@ async function detalharProduto(p) {
       : undefined,
   }));
   Object.assign(p, publicLink(p.id, p.tipo, cru.permalink));
+  if (Object.keys(vendas).length) p.campos_de_venda = vendas;
   if (String(p.tipo).toUpperCase() !== 'PRODUCT') {
     if (typeof cru.price === 'number') p.anuncios = { quantidade_anuncios: 1, menor_preco: { valor: cru.price, moeda: cru.currency_id } };
     return;
   }
   try {
-    p.anuncios = summarizeListings(await apiGet(`/products/${p.id}/items`));
+    const anuncios = await apiGet(`/products/${p.id}/items`);
+    p.anuncios = summarizeListings(anuncios);
+    const vendasDosAnuncios = findSalesFields(anuncios);
+    if (Object.keys(vendasDosAnuncios).length) p.campos_de_venda = { ...vendas, ...vendasDosAnuncios };
   } catch (err) {
     p.anuncios_indisponiveis = err.status ? `HTTP ${err.status}` : err.message;
   }

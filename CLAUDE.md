@@ -15,6 +15,9 @@ A extensão instalada continua sendo a que o Claude Desktop executa; alteraçõe
 - `server/meli.js` — credenciais, token `client_credentials` e `apiGet`, com nova tentativa em 401 e 429.
 - `server/catalogo.js` — validação de ids, links públicos e leitura de produto, fotos e anúncios.
 - `server/mineracao.js` — mineração por categoria, sinais de triagem e prioridade.
+- `server/indicadores.js` — triagem, distribuições, variação entre minerações e sugestões de produto.
+- `server/painel.js` — painel HTML de indicadores (barras em CSS, uma série, um tom).
+- `server/html.js` — escape de texto, URL e preço para as páginas geradas.
 - `server/saida.js` — grava as minerações, gera o catálogo HTML e o pacote do Accio Work.
 - `test/` — testes com `node:test` contra uma API simulada.
 
@@ -24,7 +27,8 @@ Sem dependências externas: só módulos do Node (>= 18).
 
 - A API devolve posição no ranking, não quantidade. Nunca estimar unidades vendidas, faturamento ou conversão. A prioridade da mineração é regra de triagem e sai sempre com os componentes.
 - Os termos do Mercado Livre exigem autorização para publicar estatísticas derivadas.
-- Produto proibido nunca segue para o Accio Work, com qualquer filtro.
+- Produto proibido nunca segue para o Accio Work nem entra nas sugestões, com qualquer filtro.
+- Dados de venda: a API responde 403 em `/items` e `/sites/MLB/search` para esta aplicação. Não contornar com raspagem do site; mostrar só o que vier em `campos_de_venda`.
 - Nada em stdout além das mensagens do protocolo; logs vão em stderr.
 - O Client Secret nunca entra no repositório nem em logs.
 - `MELI_API_BASE` só aceita endereço local, para o Client Secret não sair para terceiros.
