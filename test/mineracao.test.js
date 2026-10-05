@@ -141,6 +141,13 @@ test('sinaliza marca, regulacao e produto proibido', async () => {
   assert.equal(m.resumo.produtos_sem_detalhe, 1);
 });
 
+test('termo em alta so bate com palavras inteiras, incluindo numeros', () => {
+  const { termosRelacionados, sinaisRegulatorios } = require('../server/mineracao');
+  const nome = 'Power Bank 20000mAh Para iPhone e Samsung';
+  assert.deepEqual(termosRelacionados(nome, ['iphone 11', 'power bank', 'radio px']), ['power bank']);
+  assert.deepEqual(sinaisRegulatorios('Kit Chave Precisão 115 Peças'), [], 'o nome da categoria nao entra no alerta');
+});
+
 test('profundidade 0 minera so a categoria informada', async () => {
   const m = await minerarCategoria('MLB1', { profundidade: 0 });
   assert.deepEqual(m.categorias.map((c) => c.id), ['MLB1']);

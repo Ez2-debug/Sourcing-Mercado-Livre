@@ -43,7 +43,7 @@ function norm(s) {
 /* Sinais de triagem                                                   */
 /* ------------------------------------------------------------------ */
 
-// Sinalizacao por palavra-chave no nome do produto e da categoria. Serve para
+// Sinalizacao por palavra-chave no nome do produto. Serve para
 // chamar atencao na triagem; a exigencia real depende do NCM e precisa ser
 // conferida antes de qualquer cotacao.
 const REGRAS_REGULATORIAS = [
@@ -55,7 +55,9 @@ const REGRAS_REGULATORIAS = [
   {
     orgao: 'Anatel',
     motivo: 'emite radiofrequencia ou carrega bateria de celular; exige homologacao',
-    re: /bluetooth|wi-?fi|wireless|sem fio|celular|smartphone|carregador|power ?bank|roteador|radio comunicador|smartwatch|relogio inteligente|drone|\btws\b|babá eletronica|baba eletronica/,
+    // "celular" sozinho fica de fora: capa, suporte e ferramenta "para
+    // celular" nao sao produtos de telecomunicacao.
+    re: /bluetooth|wi-?fi|wireless|sem fio|^celular\b|smartphone|\btelefone\b|carregador|power ?bank|roteador|repetidor|radios? comunicador|walkie|smartwatch|relogio inteligente|drone|\btws\b|baba eletronica/,
   },
   {
     orgao: 'Anvisa',
@@ -76,14 +78,18 @@ function sinaisRegulatorios(texto) {
   return REGRAS_REGULATORIAS.filter((r) => r.re.test(t)).map((r) => ({ orgao: r.orgao, motivo: r.motivo }));
 }
 
+const PALAVRAS_VAZIAS = new Set(['a', 'o', 'e', 'de', 'do', 'da', 'em', 'com', 'para', 'por', 'sem']);
+
 // Um termo em alta "bate" com o produto quando todas as suas palavras
-// relevantes aparecem no nome.
+// aparecem inteiras no nome. Numeros e siglas curtas contam: "iphone 11" nao
+// pode bater com qualquer acessorio "para iPhone", nem "radio px" com
+// qualquer radio.
 function termosRelacionados(nome, termos) {
-  const alvo = ` ${norm(nome).replace(/[^a-z0-9]+/g, ' ')} `;
+  const alvo = new Set(norm(nome).split(/[^a-z0-9]+/).filter(Boolean));
   const achados = [];
   for (const termo of termos) {
-    const palavras = norm(termo).split(/[^a-z0-9]+/).filter((w) => w.length > 2);
-    if (palavras.length && palavras.every((w) => alvo.includes(` ${w}`))) achados.push(termo);
+    const palavras = norm(termo).split(/[^a-z0-9]+/).filter((w) => w && !PALAVRAS_VAZIAS.has(w));
+    if (palavras.length && palavras.every((w) => alvo.has(w))) achados.push(termo);
     if (achados.length >= 5) break;
   }
   return achados;
@@ -266,7 +272,9 @@ async function minerarCategoria(raizId, opcoes) {
     const marca = norm(p.marca).trim();
     p.sinais = {
       sem_marca: Boolean(p.nome) && (!marca || SEM_MARCA.test(marca)),
-      regulatorio: sinaisRegulatorios(`${p.nome || ''} ${no.caminho}`),
+      // So o nome do produto entra: o nome da categoria marcaria tudo dentro
+      // de "Celulares e Telefones", ate um jogo de chaves de precisao.
+      regulatorio: sinaisRegulatorios(p.nome),
     };
     p.prioridade = calcularPrioridade(p);
   }
