@@ -15,6 +15,7 @@ A extensão instalada continua sendo a que o Claude Desktop executa; alteraçõe
 - `server/meli.js` — credenciais, token `client_credentials` e `apiGet`, com nova tentativa em 401 e 429.
 - `server/catalogo.js` — validação de ids, links públicos e leitura de produto, fotos e anúncios.
 - `server/mineracao.js` — mineração por categoria, sinais de triagem e prioridade.
+- `server/marcas.js` — lista de marcas conhecidas; só elas barram um produto na triagem.
 - `server/indicadores.js` — triagem, distribuições, variação entre minerações e sugestões de produto.
 - `server/painel.js` — painel HTML de indicadores (barras em CSS, uma série, um tom).
 - `server/html.js` — escape de texto, URL e preço para as páginas geradas.

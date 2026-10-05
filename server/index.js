@@ -26,7 +26,7 @@ const {
   carregarMineracao, enviarParaAccio, gerarPainel, resumirMineracoes, salvarMineracao,
 } = require('./saida');
 
-const SERVER_VERSION = '0.5.0';
+const SERVER_VERSION = '0.6.0';
 const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
 /* ------------------------------------------------------------------ */
@@ -62,6 +62,7 @@ function resumoDaMineracao(m, porCategoria) {
       quantidade_anuncios: p.anuncios ? p.anuncios.quantidade_anuncios : undefined,
       prioridade: p.prioridade.pontos,
       sem_marca: p.sinais.sem_marca || undefined,
+      marca_conhecida: p.sinais.marca_conhecida || undefined,
       alertas: p.sinais.regulatorio.length ? p.sinais.regulatorio.map((r) => r.orgao) : undefined,
       em_alta: p.tendencias_relacionadas.length ? p.tendencias_relacionadas : undefined,
       detalhe_indisponivel: p.detalhe_indisponivel,
@@ -71,7 +72,7 @@ function resumoDaMineracao(m, porCategoria) {
 
 const FILTROS_ACCIO = {
   limite: { type: 'integer', minimum: 1, maximum: 100, description: 'Padrao 20. Quantos produtos enviar, por ordem de prioridade.' },
-  incluir_marcas: { type: 'boolean', description: 'Padrao false. Com true envia tambem produtos de marca registrada.' },
+  incluir_marcas: { type: 'boolean', description: 'Padrao false. Com true envia tambem produtos de marca conhecida (Samsung, Tramontina etc.). Marcas de vendedor ja seguem por padrao.' },
   incluir_regulados: { type: 'boolean', description: 'Padrao false. Com true envia tambem produtos com alerta de Anatel, Anvisa ou Inmetro. Proibidos nunca sao enviados.' },
 };
 
@@ -358,7 +359,7 @@ const TOOLS = [
     description:
       'Envia os produtos de uma mineracao ja gravada para o Accio Work: grava na pasta do Accio um briefing de sourcing ' +
       'com fotos, o JSON dos produtos e o catalogo HTML, e devolve o pedido pronto para colar no Accio. ' +
-      'Por padrao deixa de fora marcas registradas e produtos com alerta regulatorio.',
+      'Por padrao deixa de fora marcas conhecidas e produtos com alerta regulatorio.',
     inputSchema: {
       type: 'object',
       properties: {

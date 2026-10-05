@@ -50,7 +50,7 @@ const produto = (id, name, marca) => ({
 
 const PRODUTOS = {
   MLB100: produto('MLB100', 'Organizador De Gaveta Colmeia 12 Nichos', 'Genérica'),
-  MLB200: produto('MLB200', 'Aspirador Robô Inteligente', 'Xiaomi'),
+  MLB200: produto('MLB200', 'Garrafa Térmica Inox 1 Litro', 'Xiaomi'),
   MLB300: produto('MLB300', 'Vape Descartável Organizador', ''),
   MLB400: produto('MLB400', 'Lâmpada Led Bulbo 9w', 'Genérica'),
 };
@@ -208,4 +208,35 @@ test('painel traz indicadores, sugestoes e a variacao entre mineracoes', async (
   assert.match(html, /Triagem para cotação/);
   assert.match(html, /1º → 2º/);
   assert.equal(saida.gerarPainel(saida.carregarMineracao(arq.id)).indicadores.variacao.mineracao_anterior, '20260101-100000-MLB1');
+});
+
+test('so marca conhecida barra; marca de vendedor segue com aviso', () => {
+  const { classificarMarca } = require('../server/marcas');
+  const { situacao, sugerir } = require('../server/indicadores');
+  const { sinaisRegulatorios } = require('../server/mineracao');
+  assert.equal(classificarMarca('Tramontina'), 'conhecida');
+  assert.equal(classificarMarca('Philips Walita'), 'conhecida');
+  assert.equal(classificarMarca('Marqs Home'), 'de_vendedor');
+  assert.equal(classificarMarca('Genérica'), 'sem_marca');
+
+  const produto = (marca_conhecida) => ({
+    id: 'MLB1', nome: 'Mangueira De Jardim 50m', marca: 'Marqs Home', categoria: 'Jardim', melhor_posicao: 1,
+    aparicoes: [{}], tendencias_relacionadas: [], sinais: { sem_marca: false, marca_conhecida, regulatorio: [] },
+    prioridade: { pontos: 50, componentes: {} },
+  });
+  assert.equal(situacao(produto(false)), 'apto');
+  assert.equal(situacao(produto(true)), 'marca_registrada');
+  const antiga = produto(false);
+  delete antiga.sinais.marca_conhecida;
+  assert.equal(situacao(antiga), 'marca_registrada', 'mineracao antiga continua barrando qualquer marca');
+  const [s] = sugerir({ categorias: [{ produtos: [produto(false)] }] }, 1);
+  assert.equal(s.apto, true);
+  assert.match(s.ressalvas[0], /marca do vendedor \(Marqs Home\)/);
+
+  const orgaos = (n) => sinaisRegulatorios(n).map((r) => r.orgao);
+  assert.deepEqual(orgaos('Ducha Eletrônica 7500W'), ['Inmetro']);
+  assert.deepEqual(orgaos('Percarbonato De Sódio 1kg'), ['Anvisa']);
+  assert.deepEqual(orgaos('Kit 10 Potes De Vidro Hermético Marmita Forno Micro-ondas Airfryer'), [], 'uso citado no fim do nome nao conta');
+  assert.deepEqual(orgaos('Capa Protetora Colchão Box Casal'), [], 'acessorio nao herda a exigencia');
+  assert.deepEqual(orgaos('Suporte De Celular Veicular Bluetooth'), ['Anatel']);
 });

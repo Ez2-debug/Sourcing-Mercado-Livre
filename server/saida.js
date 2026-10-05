@@ -15,7 +15,7 @@ const path = require('node:path');
 
 const { ToolError, cleanEnv } = require('./meli');
 const { esc, preco, url } = require('./html');
-const { calcularIndicadores, selecionarParaAccio } = require('./indicadores');
+const { calcularIndicadores, marcaBarra, selecionarParaAccio } = require('./indicadores');
 const { painelHtml } = require('./painel');
 
 function pastaMineracoes() {
@@ -43,7 +43,11 @@ function cartaoProduto(p) {
   const an = p.anuncios || {};
   const etiquetas = [];
   if (p.sinais && p.sinais.sem_marca) etiquetas.push('<span class="tag ok">Sem marca registrada</span>');
-  if (p.marca && !(p.sinais && p.sinais.sem_marca)) etiquetas.push(`<span class="tag marca">Marca: ${esc(p.marca)}</span>`);
+  if (p.marca && p.sinais && !p.sinais.sem_marca) {
+    etiquetas.push(marcaBarra(p)
+      ? `<span class="tag alerta">Marca conhecida: ${esc(p.marca)}</span>`
+      : `<span class="tag marca">Marca do vendedor: ${esc(p.marca)}</span>`);
+  }
   for (const r of (p.sinais && p.sinais.regulatorio) || []) {
     etiquetas.push(`<span class="tag ${r.orgao === 'Proibido' ? 'ruim' : 'alerta'}" title="${esc(r.motivo)}">${esc(r.orgao)}</span>`);
   }
@@ -217,6 +221,7 @@ function briefingAccio(m, produtos) {
     '## Restrições',
     '',
     '- Não cotar item de marca registrada nem réplica; buscar produto sem marca ou com possibilidade de marca própria (OEM/ODM).',
+    '- A marca que aparece em cada produto é a do anúncio no Brasil. Ela não deve constar no produto cotado.',
     '- Os alertas regulatórios (Anatel, Anvisa, Inmetro) vieram de palavras-chave: pedir ao fornecedor os laudos e certificados correspondentes.',
     '- O Mercado Livre informa posição no ranking, não volume. Não estimar unidades vendidas a partir da posição.',
     '',
@@ -232,6 +237,11 @@ function briefingAccio(m, produtos) {
     if (an.menor_preco) linhas.push(`- Preço de referência no Brasil: ${preco(an.menor_preco.valor, an.menor_preco.moeda)} (${an.quantidade_anuncios} anúncio(s))`);
     if (p.tendencias_relacionadas.length) linhas.push(`- Termos em alta relacionados: ${p.tendencias_relacionadas.join(', ')}`);
     if (p.sinais.regulatorio.length) linhas.push(`- Alerta regulatório: ${p.sinais.regulatorio.map((r) => r.orgao).join(', ')}`);
+    if (p.marca && !p.sinais.sem_marca) {
+      linhas.push(marcaBarra(p)
+        ? `- Marca no anúncio: ${p.marca} (marca conhecida; cotar apenas equivalente sem marca)`
+        : `- Marca no anúncio: ${p.marca} (marca do vendedor; cotar o equivalente sem marca ou OEM)`);
+    }
     if (p.atributos && p.atributos.length) {
       linhas.push(`- Atributos: ${p.atributos.slice(0, 8).map((a) => `${a.nome}: ${a.valor}`).join('; ')}`);
     }

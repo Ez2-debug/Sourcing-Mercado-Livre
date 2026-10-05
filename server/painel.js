@@ -12,7 +12,7 @@ const { esc, preco, url } = require('./html');
 
 const ROTULOS_TRIAGEM = {
   apto: 'Aptos para cotação',
-  marca_registrada: 'Marca registrada',
+  marca_registrada: 'Marca conhecida',
   regulado: 'Alerta regulatório',
   proibido: 'Proibidos',
   sem_detalhe: 'Sem detalhe da API',
@@ -60,7 +60,7 @@ function cartaoSugestao(s, i) {
   return `<article class="sug">
   ${url(s.foto) ? `<img loading="lazy" src="${url(s.foto)}" alt="">` : '<div class="semfoto">sem foto</div>'}
   <div>
-    <div class="suave">${i + 1}ª sugestão · prioridade ${s.prioridade} · ${s.apto ? 'apto para cotação' : 'com ressalva'}</div>
+    <div class="suave">${i + 1}ª sugestão · prioridade ${s.prioridade} · ${s.apto ? 'apto para cotação' : 'fora da triagem'}</div>
     <h3><a href="${url(s.link)}" target="_blank" rel="noopener">${esc(s.nome)}</a></h3>
     <div class="suave">${esc(s.categoria)}${s.menor_preco !== undefined ? ` · a partir de ${preco(s.menor_preco)}` : ''}</div>
     <ul class="motivos">${s.motivos.map((m) => `<li>${esc(m)}</li>`).join('')}</ul>
@@ -140,8 +140,8 @@ function painelHtml(m, ind) {
 
 <div class="tiles">
   ${bloco('Produtos minerados', t.produtos, `em ${t.categorias_com_produto} categoria(s)`)}
-  ${bloco('Aptos para cotação', t.aptos_para_cotacao, 'sem marca e sem alerta')}
-  ${bloco('Sem marca registrada', t.sem_marca_registrada)}
+  ${bloco('Aptos para cotação', t.aptos_para_cotacao, 'sem marca conhecida e sem alerta')}
+  ${bloco('Sem marca conhecida', t.sem_marca_conhecida, 'sem marca ou marca de vendedor')}
   ${bloco('Batem com termo em alta', t.em_alta)}
   ${bloco('Faixa de menor preço', faixa)}
 </div>

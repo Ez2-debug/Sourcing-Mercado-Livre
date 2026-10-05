@@ -17,6 +17,7 @@ const { SITE, ToolError, apiGet, mapLimit } = require('./meli');
 const {
   brandOf, dropEmpty, findSalesFields, pathForProduct, photosOf, publicLink, summarizeListings,
 } = require('./catalogo');
+const { classificarMarca } = require('./marcas');
 
 const LIMITES = {
   profundidade: { padrao: 1, min: 0, max: 2 },
@@ -61,21 +62,35 @@ const REGRAS_REGULATORIAS = [
   },
   {
     orgao: 'Anvisa',
-    motivo: 'produto de saude, cosmetico, suplemento ou alimento; exige regularizacao',
-    re: /suplemento|vitamina|whey|creatina|cosmetic|creme|serum|protetor solar|medicamento|shampoo|condicionador|perfume|maquiagem|esmalte|termometro|oximetro|medidor de pressao|glicosimetro|massageador|lente de contato|preservativo|repelente/,
+    motivo: 'produto de saude, cosmetico, suplemento, alimento ou saneante; exige regularizacao',
+    soNoInicio: true,
+    re: /suplemento|vitamina|whey|creatina|cosmetic|creme|serum|protetor solar|medicamento|shampoo|condicionador|perfume|maquiagem|esmalte|termometro|oximetro|medidor de pressao|glicosimetro|massageador|lente de contato|preservativo|repelente|percarbonato|alvejante|tira manchas|sabao|lava roupas|detergente|desinfetante|amaciante|agua sanitaria|inseticida|aromatizador|canfora|antimofo/,
   },
   {
     orgao: 'Inmetro',
     motivo: 'certificacao compulsoria provavel',
-    re: /brinquedo|boneca|capacete|cadeirinha|berco|carrinho de bebe|chupeta|mamadeira|panela de pressao|ventilador|air ?fryer|fritadeira|liquidificador|ferro de passar|secador de cabelo|chapinha|lampada|extensao eletrica|filtro de linha|isqueiro|pneu|colchao/,
+    soNoInicio: true,
+    re: /brinquedo|boneca|capacete|cadeirinha|berco|carrinho de bebe|chupeta|mamadeira|panela de pressao|ventilador|air ?fryer|fritadeira|liquidificador|ferro de passar|secador de cabelo|chapinha|lampada|extensao eletrica|filtro de linha|isqueiro|pneu|colchao|chuveiro|ducha|cafeteira|sanduicheira|batedeira|aspirador|aquecedor|micro-?ondas|\bforno\b|\bgrill\b|\beletric[ao]s?\b|refletor|plafon|luminaria|fita led/,
   },
 ];
 
-const SEM_MARCA = /^(generic[ao]|sem marca|n\/?a|outros?|oem|importad[ao]|nao se aplica|unbranded)$/;
+// Acessorio de um produto regulado nao herda a exigencia dele.
+const ACESSORIO = /^(kit \d+ )?(capa|capinha|suporte|pelicula|estojo|bolsa|adesivo)\b/;
+const PALAVRAS_NO_INICIO = 6;
 
+// As regras de Anvisa e Inmetro olham so o comeco do nome, onde fica o tipo
+// do produto. O resto do titulo costuma listar usos ("para airfryer", "whey")
+// que nao dizem o que o produto e.
 function sinaisRegulatorios(texto) {
   const t = norm(texto);
-  return REGRAS_REGULATORIAS.filter((r) => r.re.test(t)).map((r) => ({ orgao: r.orgao, motivo: r.motivo }));
+  const inicio = t.split(/\s+/).slice(0, PALAVRAS_NO_INICIO).join(' ');
+  const acessorio = ACESSORIO.test(t);
+  return REGRAS_REGULATORIAS
+    .filter((r) => {
+      if (acessorio && r.soNoInicio) return false;
+      return r.re.test(r.soNoInicio ? inicio : t);
+    })
+    .map((r) => ({ orgao: r.orgao, motivo: r.motivo }));
 }
 
 const PALAVRAS_VAZIAS = new Set(['a', 'o', 'e', 'de', 'do', 'da', 'em', 'com', 'para', 'por', 'sem']);
@@ -100,7 +115,8 @@ function calcularPrioridade(p) {
   comp.posicao_no_ranking = Math.max(0, 21 - (p.melhor_posicao || 21)) * 2;
   comp.presenca_em_varias_categorias = Math.min(3, p.aparicoes.length - 1) * 5;
   comp.termo_em_alta = p.tendencias_relacionadas && p.tendencias_relacionadas.length ? 15 : 0;
-  comp.sem_marca_registrada = p.sinais.sem_marca ? 15 : 0;
+  // Marca de vendedor pontua menos que produto sem marca; marca conhecida nao pontua.
+  comp.sem_marca_registrada = p.sinais.sem_marca ? 15 : (p.sinais.marca_conhecida ? 0 : 10);
   const n = p.anuncios && p.anuncios.quantidade_anuncios;
   comp.poucos_anuncios_concorrentes = n === undefined ? 0 : (n <= 3 ? 10 : (n <= 10 ? 5 : 0));
   comp.alerta_regulatorio = -15 * p.sinais.regulatorio.filter((r) => r.orgao !== 'Proibido').length;
@@ -275,9 +291,10 @@ async function minerarCategoria(raizId, opcoes) {
     const termos = new Set();
     for (const a of p.aparicoes) for (const t of porId.get(a.categoria_id).termos_em_alta) termos.add(t);
     p.tendencias_relacionadas = p.nome ? termosRelacionados(p.nome, termos) : [];
-    const marca = norm(p.marca).trim();
+    const tipoDeMarca = classificarMarca(p.marca);
     p.sinais = {
-      sem_marca: Boolean(p.nome) && (!marca || SEM_MARCA.test(marca)),
+      sem_marca: Boolean(p.nome) && tipoDeMarca === 'sem_marca',
+      marca_conhecida: tipoDeMarca === 'conhecida',
       // So o nome do produto entra: o nome da categoria marcaria tudo dentro
       // de "Celulares e Telefones", ate um jogo de chaves de precisao.
       regulatorio: sinaisRegulatorios(p.nome),

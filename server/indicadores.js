@@ -43,6 +43,12 @@ const precoDe = (p) => (p.anuncios && p.anuncios.menor_preco ? p.anuncios.menor_
 /* Triagem                                                             */
 /* ------------------------------------------------------------------ */
 
+// Mineracoes gravadas antes da lista de marcas conhecidas nao tem o campo
+// marca_conhecida; nelas qualquer marca preenchida continua barrando.
+function marcaBarra(p) {
+  return p.sinais.marca_conhecida !== undefined ? p.sinais.marca_conhecida : !p.sinais.sem_marca;
+}
+
 // Situacao do produto na triagem para cotacao. A ordem importa: proibido
 // vence qualquer outro motivo.
 function situacao(p) {
@@ -50,7 +56,7 @@ function situacao(p) {
   const reg = p.sinais.regulatorio;
   if (reg.some((r) => r.orgao === 'Proibido')) return 'proibido';
   if (reg.length) return 'regulado';
-  if (!p.sinais.sem_marca) return 'marca_registrada';
+  if (marcaBarra(p)) return 'marca_registrada';
   return 'apto';
 }
 
@@ -69,7 +75,7 @@ function selecionarParaAccio(m, filtros) {
     // Produto proibido nunca segue para cotacao, independente do filtro.
     if (reg.some((r) => r.orgao === 'Proibido')) { descartados.proibido += 1; continue; }
     if (reg.length && f.incluir_regulados !== true) { descartados.regulado += 1; continue; }
-    if (!p.sinais.sem_marca && f.incluir_marcas !== true) { descartados.marca_registrada += 1; continue; }
+    if (marcaBarra(p) && f.incluir_marcas !== true) { descartados.marca_registrada += 1; continue; }
     aceitos.push(p);
   }
   aceitos.sort(porPrioridade);
@@ -85,7 +91,7 @@ function motivos(p) {
   const lista = [`${p.melhor_posicao}º no ranking de mais vendidos`];
   if (p.aparicoes.length > 1) lista.push(`aparece em ${p.aparicoes.length} rankings`);
   if (c.termo_em_alta) lista.push(`bate com o termo em alta "${p.tendencias_relacionadas[0]}"`);
-  if (c.sem_marca_registrada) lista.push('sem marca registrada');
+  if (p.sinais.sem_marca) lista.push('sem marca registrada');
   const n = p.anuncios && p.anuncios.quantidade_anuncios;
   if (c.poucos_anuncios_concorrentes) lista.push(n === 1 ? 'um único anúncio concorrente' : `só ${n} anúncios concorrentes`);
   return lista;
@@ -93,7 +99,8 @@ function motivos(p) {
 
 function ressalvas(p) {
   const lista = [];
-  if (!p.sinais.sem_marca) lista.push(`marca registrada (${p.marca}): só com produto equivalente sem marca`);
+  if (marcaBarra(p)) lista.push(`marca registrada (${p.marca}): só com produto equivalente sem marca`);
+  else if (!p.sinais.sem_marca) lista.push(`marca do vendedor (${p.marca}): cotar o equivalente sem marca`);
   for (const r of p.sinais.regulatorio) lista.push(`${r.orgao}: ${r.motivo}`);
   return lista;
 }
@@ -188,7 +195,7 @@ function calcularIndicadores(m, anterior) {
       produtos: produtos.length,
       categorias_com_produto: m.categorias.filter((c) => c.produtos.length).length,
       aptos_para_cotacao: triagem.apto,
-      sem_marca_registrada: produtos.filter((p) => p.sinais && p.sinais.sem_marca).length,
+      sem_marca_conhecida: produtos.filter((p) => p.nome && p.sinais && !marcaBarra(p)).length,
       em_alta: produtos.filter((p) => p.tendencias_relacionadas && p.tendencias_relacionadas.length).length,
       menor_preco: precos.length ? Math.min(...precos) : undefined,
       maior_preco: precos.length ? Math.max(...precos) : undefined,
@@ -211,4 +218,4 @@ function calcularIndicadores(m, anterior) {
   };
 }
 
-module.exports = { calcularIndicadores, comparar, selecionarParaAccio, situacao, sugerir };
+module.exports = { calcularIndicadores, comparar, marcaBarra, selecionarParaAccio, situacao, sugerir };

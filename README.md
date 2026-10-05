@@ -28,7 +28,7 @@ Roda como extensão do Claude Desktop (formato MCPB) e não tem dependências al
 2. lê o ranking de mais vendidos e os termos em alta de cada uma;
 3. junta as aparições de cada produto e o coloca na categoria mais específica em que ele aparece;
 4. busca nome, marca, fotos, atributos e anúncios (menor preço, vendedores, lojas oficiais, Full) dos mais bem colocados;
-5. marca os sinais de triagem: produto sem marca registrada, termo em alta relacionado e alerta regulatório (Anatel, Anvisa, Inmetro, proibido);
+5. marca os sinais de triagem: tipo de marca (sem marca, marca de vendedor ou marca conhecida), termo em alta relacionado e alerta regulatório (Anatel, Anvisa, Inmetro, proibido);
 6. calcula uma prioridade de 0 a 100 e grava o resultado.
 
 As categorias saem com o nome e o caminho que o site usa (por exemplo `Celulares e Telefones > Acessórios para Celulares`) e com foto. Quando a subcategoria não tem imagem própria, a capa é a foto do produto mais bem colocado dela.
@@ -48,12 +48,25 @@ A API do Mercado Livre informa a posição no ranking, nunca a quantidade vendid
 | Posição no ranking | até 40 |
 | Presença em mais de uma categoria | até 15 |
 | Bate com um termo em alta | 15 |
-| Sem marca registrada | 15 |
+| Sem marca | 15 |
+| Marca de vendedor | 10 |
 | Poucos anúncios concorrentes | 5 ou 10 |
 | Alerta regulatório | −15 cada |
 | Produto proibido | zera |
 
-Os alertas regulatórios vêm de palavras-chave no nome do produto e da categoria. Servem para chamar atenção; a exigência real depende do NCM.
+### Marcas
+
+Quase todo produto do catálogo tem o campo marca preenchido, e na maioria das vezes é a marca própria de um vendedor. A triagem separa três casos:
+
+- **sem marca**: campo vazio ou "Genérica";
+- **marca de vendedor**: qualquer marca fora da lista de `server/marcas.js`. Segue para cotação, com o aviso de cotar o equivalente sem marca;
+- **marca conhecida**: fabricantes e marcas de grande circulação (Samsung, Tramontina, Lorenzetti, Omo). Fica fora da cotação.
+
+A lista não é completa nem substitui uma consulta ao INPI. Uma marca registrada que não esteja nela passa como marca de vendedor; ao encontrar uma, acrescente em `server/marcas.js`.
+
+### Alertas regulatórios
+
+Vêm de palavras-chave no nome do produto. As regras de Anvisa e Inmetro olham só as seis primeiras palavras, onde fica o tipo do produto, para não disparar com usos citados no fim do título ("para airfryer"). Capas, suportes e outros acessórios não herdam a exigência do produto principal. Servem para chamar atenção; a exigência real depende do NCM.
 
 ## Painel de indicadores
 
@@ -83,7 +96,7 @@ O Accio Work trabalha sobre pastas do computador. `enviar_para_accio` grava em `
 
 A ferramenta devolve o pedido pronto para colar no Accio Work, apontando para essa pasta.
 
-Por padrão ficam de fora os produtos de marca registrada e os que têm alerta regulatório; `incluir_marcas` e `incluir_regulados` afrouxam o filtro. Produto proibido nunca é enviado.
+Por padrão ficam de fora os produtos de marca conhecida e os que têm alerta regulatório; `incluir_marcas` e `incluir_regulados` afrouxam o filtro. Produto proibido nunca é enviado.
 
 O Accio Work também aceita servidores MCP personalizados. Para os agentes dele chamarem estas ferramentas direto, registre o servidor pela linha de comando do Accio. O comando abaixo segue a documentação do `accio-mcp-cli` e ainda não foi testado neste projeto:
 
