@@ -1,0 +1,79 @@
+{
+  "manifest_version": "0.2",
+  "name": "conecta-hub-sourcing",
+  "display_name": "Conecta Hub Sourcing",
+  "version": "0.2.2",
+  "description": "Consulta categorias, tendências e produtos mais vendidos do Mercado Livre Brasil para apoiar decisões de sourcing.",
+  "long_description": "Extensão local que consulta a API oficial do Mercado Livre com a aplicação Conecta Hub Sourcing. Traz as categorias, os termos de busca em alta, o ranking dos mais vendidos por categoria e os dados de cada produto. O Client Secret fica guardado no seu computador e o token de acesso é renovado automaticamente. A API informa a posição no ranking, não a quantidade vendida.",
+  "author": {
+    "name": "Conecta Hub"
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/index.js"
+      ],
+      "env": {
+        "MELI_CLIENT_SECRET": "${user_config.client_secret}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "listar_categorias",
+      "description": "Lista as categorias principais do Mercado Livre Brasil e seus códigos."
+    },
+    {
+      "name": "detalhar_categoria",
+      "description": "Mostra o caminho e as subcategorias de uma categoria."
+    },
+    {
+      "name": "tendencias",
+      "description": "Termos de busca em alta na semana, no Brasil ou em uma categoria."
+    },
+    {
+      "name": "mais_vendidos",
+      "description": "Ranking dos 20 mais vendidos de uma categoria, com link, nome e preço."
+    },
+    {
+      "name": "detalhar_produto",
+      "description": "Dados de um produto do catálogo: link, nome, marca, preço e atributos."
+    },
+    {
+      "name": "anuncios_do_produto",
+      "description": "Anúncios de um produto, com preço, vendedor e link de cada um."
+    },
+    {
+      "name": "consulta_api",
+      "description": "Diagnóstico: mostra a resposta crua de um recurso de catálogo da API."
+    }
+  ],
+  "keywords": [
+    "mercado livre",
+    "sourcing",
+    "tendências",
+    "conecta hub"
+  ],
+  "license": "UNLICENSED",
+  "compatibility": {
+    "platforms": [
+      "win32",
+      "darwin"
+    ],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  },
+  "user_config": {
+    "client_secret": {
+      "type": "string",
+      "title": "Client Secret",
+      "description": "Chave secreta da aplicação Conecta Hub Sourcing (DevCenter > Editar > Client Secret > Mostrar). É o único campo; o Client ID já vem embutido. Fica guardada só neste computador.",
+      "required": true,
+      "sensitive": true
+    }
+  }
+}
