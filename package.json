@@ -1,0 +1,15 @@
+{
+  "name": "conecta-hub-sourcing",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Servidor MCP que minera produtos do Mercado Livre Brasil por categoria e entrega o resultado ao Accio Work.",
+  "license": "UNLICENSED",
+  "main": "server/index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test"
+  }
+}

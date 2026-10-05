@@ -2,9 +2,9 @@
   "manifest_version": "0.2",
   "name": "conecta-hub-sourcing",
   "display_name": "Conecta Hub Sourcing",
-  "version": "0.2.2",
-  "description": "Consulta categorias, tendências e produtos mais vendidos do Mercado Livre Brasil para apoiar decisões de sourcing.",
-  "long_description": "Extensão local que consulta a API oficial do Mercado Livre com a aplicação Conecta Hub Sourcing. Traz as categorias, os termos de busca em alta, o ranking dos mais vendidos por categoria e os dados de cada produto. O Client Secret fica guardado no seu computador e o token de acesso é renovado automaticamente. A API informa a posição no ranking, não a quantidade vendida.",
+  "version": "0.3.0",
+  "description": "Minera produtos do Mercado Livre Brasil por categoria, com fotos, e entrega o resultado ao Accio Work.",
+  "long_description": "Extensão local que consulta a API oficial do Mercado Livre com a aplicação Conecta Hub Sourcing. Minera uma categoria e suas subcategorias, cruza o ranking dos mais vendidos com os termos em alta e com os anúncios de cada produto, e agrupa o resultado pelas categorias com o nome e a foto que o site usa. Grava um catálogo HTML e envia os produtos escolhidos para a pasta do Accio Work. O Client Secret fica guardado no seu computador e o token de acesso é renovado automaticamente. A API informa a posição no ranking, não a quantidade vendida.",
   "author": {
     "name": "Conecta Hub"
   },
@@ -17,7 +17,8 @@
         "${__dirname}/server/index.js"
       ],
       "env": {
-        "MELI_CLIENT_SECRET": "${user_config.client_secret}"
+        "MELI_CLIENT_SECRET": "${user_config.client_secret}",
+        "ACCIO_WORK_DIR": "${user_config.pasta_accio}"
       }
     }
   },
@@ -28,7 +29,7 @@
     },
     {
       "name": "detalhar_categoria",
-      "description": "Mostra o caminho e as subcategorias de uma categoria."
+      "description": "Mostra o nome, a foto, o caminho e as subcategorias de uma categoria."
     },
     {
       "name": "tendencias",
@@ -36,7 +37,7 @@
     },
     {
       "name": "mais_vendidos",
-      "description": "Ranking dos 20 mais vendidos de uma categoria, com link, nome e preço."
+      "description": "Ranking dos 20 mais vendidos de uma categoria, com link, nome, foto e preço."
     },
     {
       "name": "detalhar_produto",
@@ -47,6 +48,18 @@
       "description": "Anúncios de um produto, com preço, vendedor e link de cada um."
     },
     {
+      "name": "minerar_categoria",
+      "description": "Minera uma categoria e suas subcategorias e agrupa os produtos por categoria, com fotos."
+    },
+    {
+      "name": "listar_mineracoes",
+      "description": "Lista as minerações já gravadas neste computador."
+    },
+    {
+      "name": "enviar_para_accio",
+      "description": "Envia os produtos de uma mineração para a pasta do Accio Work."
+    },
+    {
       "name": "consulta_api",
       "description": "Diagnóstico: mostra a resposta crua de um recurso de catálogo da API."
     }
@@ -55,7 +68,9 @@
     "mercado livre",
     "sourcing",
     "tendências",
-    "conecta hub"
+    "conecta hub",
+    "mineração",
+    "accio work"
   ],
   "license": "UNLICENSED",
   "compatibility": {
@@ -74,6 +89,12 @@
       "description": "Chave secreta da aplicação Conecta Hub Sourcing (DevCenter > Editar > Client Secret > Mostrar). É o único campo; o Client ID já vem embutido. Fica guardada só neste computador.",
       "required": true,
       "sensitive": true
+    },
+    "pasta_accio": {
+      "type": "directory",
+      "title": "Pasta do Accio Work",
+      "description": "Opcional. Pasta onde o Accio Work guarda os trabalhos. Em branco usa a pasta AccioWork dentro da sua pasta de usuário.",
+      "required": false
     }
   }
 }
