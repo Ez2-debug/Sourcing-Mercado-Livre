@@ -39,6 +39,19 @@ function distribuir(valores, faixas) {
 
 const precoDe = (p) => (p.anuncios && p.anuncios.menor_preco ? p.anuncios.menor_preco.valor : undefined);
 
+// "3924.10.00" quando ha candidato de 8 digitos; senao so a posicao.
+function ncmCurto(p) {
+  if (!p.ncm) return undefined;
+  return p.ncm.sugestoes.length ? p.ncm.sugestoes[0].codigo : `posição ${p.ncm.posicao[0].codigo}`;
+}
+
+function textoDaEstimativa(e) {
+  const partes = [];
+  if (e.vendas !== undefined) partes.push(`${e.vendas.toLocaleString('pt-BR')} un.`);
+  if (e.faturamento !== undefined) partes.push(`R$ ${e.faturamento.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`);
+  return `${partes.join(' · ')} por ${e.periodo === 'mensal' ? 'mês' : 'semana'}`;
+}
+
 /* ------------------------------------------------------------------ */
 /* Triagem                                                             */
 /* ------------------------------------------------------------------ */
@@ -94,6 +107,7 @@ function motivos(p) {
   if (p.sinais.sem_marca) lista.push('sem marca registrada');
   const n = p.anuncios && p.anuncios.quantidade_anuncios;
   if (c.poucos_anuncios_concorrentes) lista.push(n === 1 ? 'um único anúncio concorrente' : `só ${n} anúncios concorrentes`);
+  if (p.estimativa_externa) lista.push(`estimativa da ${p.estimativa_externa.fonte}: ${textoDaEstimativa(p.estimativa_externa)}`);
   return lista;
 }
 
@@ -121,6 +135,7 @@ function sugerir(m, quantidade) {
       menor_preco: precoDe(p),
       prioridade: p.prioridade.pontos,
       apto: situacao(p) === 'apto',
+      ncm: ncmCurto(p),
       motivos: motivos(p),
     };
     const r = ressalvas(p);
@@ -172,6 +187,26 @@ function comparar(m, anterior) {
   };
 }
 
+// Estimativas de venda de terceiros registradas nos produtos. Os numeros
+// saem como a fonte informou, do maior para o menor.
+function resumirEstimativas(produtos) {
+  const com = produtos.filter((p) => p.estimativa_externa);
+  if (!com.length) return null;
+  const fontes = Array.from(new Set(com.map((p) => p.estimativa_externa.fonte)));
+  const periodos = Array.from(new Set(com.map((p) => p.estimativa_externa.periodo)));
+  const ranking = com.filter((p) => p.estimativa_externa.vendas !== undefined)
+    .sort((a, b) => b.estimativa_externa.vendas - a.estimativa_externa.vendas)
+    .slice(0, 10)
+    .map((p) => ({ rotulo: p.nome, detalhe: `${p.nome} (${textoDaEstimativa(p.estimativa_externa)})`, valor: p.estimativa_externa.vendas }));
+  return {
+    fontes,
+    periodos,
+    produtos_com_estimativa: com.length,
+    ranking_por_vendas: ranking,
+    aviso: `Vendas e faturamento sao estimativas de ${fontes.join(', ')}, nao transacoes reais nem dado do Mercado Livre.`,
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /* Indicadores                                                         */
 /* ------------------------------------------------------------------ */
@@ -213,9 +248,14 @@ function calcularIndicadores(m, anterior) {
         : 'A API nao devolveu nenhum campo de vendas. Com o token desta aplicacao, /items e /sites/MLB/search respondem 403 ' +
           'e os produtos de catalogo nao trazem quantidade vendida. O sinal de demanda disponivel e a posicao no ranking e sua variacao entre mineracoes.',
     },
+    estimativas_externas: resumirEstimativas(produtos),
+    ncm: {
+      ...(m.ncm || { disponivel: false, motivo: 'mineracao gravada antes da sugestao de NCM' }),
+      produtos_com_sugestao: produtos.filter((p) => p.ncm).length,
+    },
     variacao: comparar(m, anterior),
     sugestoes: sugerir(m, 8),
   };
 }
 
-module.exports = { calcularIndicadores, comparar, marcaBarra, selecionarParaAccio, situacao, sugerir };
+module.exports = { calcularIndicadores, comparar, marcaBarra, ncmCurto, selecionarParaAccio, situacao, sugerir, textoDaEstimativa };

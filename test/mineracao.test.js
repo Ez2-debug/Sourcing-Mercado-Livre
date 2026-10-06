@@ -240,3 +240,52 @@ test('so marca conhecida barra; marca de vendedor segue com aviso', () => {
   assert.deepEqual(orgaos('Capa Protetora Colchão Box Casal'), [], 'acessorio nao herda a exigencia');
   assert.deepEqual(orgaos('Suporte De Celular Veicular Bluetooth'), ['Anatel']);
 });
+
+test('sugere NCM pela tabela oficial e so da codigo quando ha palavra em comum', async () => {
+  process.env.NCM_TABELA = path.join(__dirname, 'fixtures', 'ncm-recorte.json');
+  const { anotarNcm, carregarTabela, sugerirNcm } = require('../server/ncm');
+  const t = await carregarTabela();
+
+  const rodizio = sugerirNcm(t, 'Kit 8 Rodinhas Para Moveis Rodízio Roda 50mm', '');
+  assert.deepEqual(rodizio.posicao.map((p) => p.codigo), ['83.02', '83.01']);
+  assert.ok(rodizio.sugestoes.some((s) => s.codigo === '8302.20.00'), 'rodizios');
+
+  const cortina = sugerirNcm(t, 'Cortina Blackout 4,00x2,80 Metros', '');
+  assert.equal(cortina.posicao[0].codigo, '63.03');
+  assert.deepEqual(cortina.sugestoes, [], 'sem palavra em comum fica so a posicao');
+
+  assert.deepEqual(sugerirNcm(t, 'Power Bank 20000mAh', '').sugestoes.map((s) => s.codigo), ['8507.60.00'], 'unico codigo na subposicao');
+  assert.equal(sugerirNcm(t, 'Suporte De Celular Veicular', ''), null, 'tipo fora do dicionario');
+
+  const produtos = [{ id: 'A', nome: 'Kit 10 Pote De Vidro Hermético', atributos: [{ nome: 'Material', valor: 'Vidro' }] }, { id: 'B' }];
+  const resumo = await anotarNcm(produtos);
+  assert.equal(resumo.disponivel, true);
+  assert.equal(resumo.produtos_com_sugestao, 1);
+  assert.equal(produtos[0].ncm.posicao[0].codigo, '70.13');
+});
+
+test('registra estimativas de terceiros e mostra no painel com a fonte', async () => {
+  const { registrarEstimativas } = require('../server/estimativas');
+  const m = await minerarCategoria('MLB1', {});
+  m.consultado_em = '2026-02-01T10:00:00.000Z';
+  const arq = saida.salvarMineracao(m);
+  assert.equal(arq.indicadores.estimativas_externas, null);
+
+  const gravada = saida.carregarMineracao(arq.id);
+  const registro = registrarEstimativas(gravada, {
+    fonte: 'JoomPulse',
+    estimativas: [{ produto_id: 'mlb100', vendas: 320, faturamento: 9568 }, { produto_id: 'MLB999', vendas: 5 }],
+  });
+  assert.deepEqual([registro.registrados, registro.fora_da_mineracao], [1, ['MLB999']]);
+  const { painel, indicadores } = saida.regravarMineracao(gravada);
+
+  assert.deepEqual(indicadores.estimativas_externas.fontes, ['JoomPulse']);
+  assert.equal(indicadores.estimativas_externas.ranking_por_vendas[0].valor, 320);
+  assert.ok(indicadores.sugestoes[0].motivos.some((x) => /estimativa da JoomPulse: 320 un\. · R\$ 9\.568 por semana/.test(x)));
+  assert.match(fs.readFileSync(painel, 'utf8'), /Estimativas de JoomPulse, não transações reais/);
+  assert.equal(saida.carregarMineracao(arq.id).categorias.flatMap((c) => c.produtos).find((p) => p.id === 'MLB100').estimativa_externa.vendas, 320);
+
+  assert.throws(() => registrarEstimativas(gravada, { fonte: '', estimativas: [{ produto_id: 'MLB100', vendas: 1 }] }), /Informe a fonte/);
+  assert.throws(() => registrarEstimativas(gravada, { fonte: 'X', estimativas: [{ produto_id: 'MLB100', vendas: -1 }] }), /vendas invalido/);
+  assert.throws(() => registrarEstimativas(gravada, { fonte: 'X', estimativas: [{ produto_id: 'MLB999', vendas: 1 }] }), /Nenhum produto_id/);
+});

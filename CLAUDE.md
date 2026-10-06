@@ -16,6 +16,8 @@ A extensão instalada continua sendo a que o Claude Desktop executa; alteraçõe
 - `server/catalogo.js` — validação de ids, links públicos e leitura de produto, fotos e anúncios.
 - `server/mineracao.js` — mineração por categoria, sinais de triagem e prioridade.
 - `server/marcas.js` — lista de marcas conhecidas; só elas barram um produto na triagem.
+- `server/ncm.js` e `server/ncm-posicoes.js` — sugestão de NCM: dicionário de tipo de produto para posição, e tabela oficial do Siscomex (com cache) para os códigos.
+- `server/estimativas.js` — registro de estimativas de venda de terceiros (JoomPulse) nos produtos.
 - `server/indicadores.js` — triagem, distribuições, variação entre minerações e sugestões de produto.
 - `server/painel.js` — painel HTML de indicadores (barras em CSS, uma série, um tom).
 - `server/html.js` — escape de texto, URL e preço para as páginas geradas.
@@ -26,10 +28,11 @@ Sem dependências externas: só módulos do Node (>= 18).
 
 ## Regras a manter
 
-- A API devolve posição no ranking, não quantidade. Nunca estimar unidades vendidas, faturamento ou conversão. A prioridade da mineração é regra de triagem e sai sempre com os componentes.
+- A API devolve posição no ranking, não quantidade. O sistema nunca estima unidades vendidas, faturamento ou conversão. Estimativas de terceiros só entram por `registrar_vendas_estimadas`, com a fonte, e saem sempre rotuladas como estimativa. A prioridade da mineração é regra de triagem e sai sempre com os componentes.
 - Os termos do Mercado Livre exigem autorização para publicar estatísticas derivadas.
 - Produto proibido nunca segue para o Accio Work nem entra nas sugestões, com qualquer filtro.
 - Dados de venda: a API responde 403 em `/items` e `/sites/MLB/search` para esta aplicação. Não contornar com raspagem do site; mostrar só o que vier em `campos_de_venda`.
+- NCM é sugestão para o despachante: sem alíquota, e código de 8 dígitos só quando as primeiras palavras da descrição oficial estão no anúncio.
 - Nada em stdout além das mensagens do protocolo; logs vão em stderr.
 - O Client Secret nunca entra no repositório nem em logs.
 - `MELI_API_BASE` só aceita endereço local, para o Client Secret não sair para terceiros.

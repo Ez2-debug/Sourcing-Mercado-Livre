@@ -17,6 +17,8 @@ Roda como extensão do Claude Desktop (formato MCPB) e não tem dependências al
 | `minerar_categoria` | Mineração por categoria (ver abaixo). |
 | `listar_mineracoes` | Minerações já gravadas neste computador. |
 | `painel_indicadores` | Indicadores, variação no ranking e sugestões de produto de uma mineração. |
+| `registrar_vendas_estimadas` | Grava nos produtos minerados as estimativas de venda de uma fonte externa, como o JoomPulse. |
+| `sugerir_ncm` | Sugere a posição e códigos da NCM para um produto, pela tabela oficial do Siscomex. |
 | `enviar_para_accio` | Envia os produtos de uma mineração para o Accio Work. |
 | `consulta_api` | Diagnóstico: resposta crua de um recurso de catálogo. |
 
@@ -85,6 +87,31 @@ O `painel.html` de cada mineração mostra:
 A API não entrega quantidade vendida a esta aplicação. Com o token `client_credentials`, `/items` e `/sites/MLB/search` respondem 403, e os produtos de catálogo não trazem esse campo. O painel mostra qualquer campo de venda que a API devolver e, quando não vem nenhum, diz isso.
 
 O sinal de demanda disponível é a posição no ranking e a sua variação. Por isso vale minerar a mesma categoria de novo a cada semana: a comparação é o que mostra tendência.
+
+## Sugestão de NCM
+
+Cada produto minerado recebe uma sugestão de NCM, e `sugerir_ncm` faz o mesmo para uma descrição avulsa.
+
+- A **posição** (4 dígitos) vem de um dicionário de tipos de produto em `server/ncm-posicoes.js`. A descrição legal da NCM raramente usa a palavra do anúncio (mangueira de jardim está em "tubos e seus acessórios, de plástico"), então a busca por texto sozinha não acha a posição.
+- Os **códigos de 8 dígitos** e as descrições vêm da tabela oficial de nomenclatura do Portal Único Siscomex, baixada uma vez e guardada em `~/ConectaHubSourcing/ncm-siscomex.json` por 30 dias.
+- Um código de 8 dígitos só é sugerido quando as primeiras palavras da descrição dele estão no anúncio. Sem isso, a sugestão fica só na posição.
+- Tipos de produto fora do dicionário ficam sem sugestão.
+
+A sugestão é ponto de partida, não classificação fiscal: o material e a função mudam a posição, e quem classifica é o despachante. A tabela oficial não traz alíquotas, então o sistema não calcula impostos.
+
+## Estimativas de venda de terceiros (JoomPulse)
+
+A API do Mercado Livre não informa vendas, mas ferramentas de inteligência de mercado publicam estimativas próprias. O [JoomPulse](https://joompulse.com) oferece um conector MCP (`https://joompulse.com/mcp`) com vendas e faturamento semanais estimados; o acesso exige conta no JoomPulse.
+
+O fluxo é:
+
+1. conectar o JoomPulse ao Claude (o `.mcp.json` deste repositório já declara o servidor para sessões do Claude Code abertas na pasta; no Claude Desktop, adicione como conector personalizado);
+2. minerar a categoria;
+3. pedir ao Claude para consultar no JoomPulse os produtos sugeridos e gravar o resultado com `registrar_vendas_estimadas`.
+
+As estimativas ficam em cada produto, com a fonte e o período, e aparecem no painel, nas sugestões e no briefing do Accio Work, sempre rotuladas como estimativa de terceiros. O sistema não calcula nem ajusta esses números, e a prioridade de triagem não os usa.
+
+O repositório [joomcode/joompulse-skills](https://github.com/joomcode/joompulse-skills) (MIT) traz skills prontas para o mesmo conector, como produtos sem marca por categoria e nichos sem concorrência.
 
 ## Envio para o Accio Work
 

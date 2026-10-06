@@ -9,6 +9,7 @@
  */
 
 const { esc, preco, url } = require('./html');
+const { ncmCurto, textoDaEstimativa } = require('./indicadores');
 
 const ROTULOS_TRIAGEM = {
   apto: 'Aptos para cotação',
@@ -62,11 +63,26 @@ function cartaoSugestao(s, i) {
   <div>
     <div class="suave">${i + 1}ª sugestão · prioridade ${s.prioridade} · ${s.apto ? 'apto para cotação' : 'fora da triagem'}</div>
     <h3><a href="${url(s.link)}" target="_blank" rel="noopener">${esc(s.nome)}</a></h3>
-    <div class="suave">${esc(s.categoria)}${s.menor_preco !== undefined ? ` · a partir de ${preco(s.menor_preco)}` : ''}</div>
+    <div class="suave">${esc(s.categoria)}${s.menor_preco !== undefined ? ` · a partir de ${preco(s.menor_preco)}` : ''}${s.ncm ? ` · NCM sugerida: ${esc(s.ncm)}` : ''}</div>
     <ul class="motivos">${s.motivos.map((m) => `<li>${esc(m)}</li>`).join('')}</ul>
     ${s.ressalvas ? `<ul class="ressalvas">${s.ressalvas.map((r) => `<li><span aria-hidden="true">⚠</span> ${esc(r)}</li>`).join('')}</ul>` : ''}
   </div>
 </article>`;
+}
+
+function secaoEstimativas(e) {
+  if (!e) {
+    return '<p class="suave">Nenhuma estimativa de terceiros registrada. Com um conector de inteligência de mercado (por exemplo JoomPulse), a ferramenta registrar_vendas_estimadas grava aqui as estimativas de venda de cada produto.</p>';
+  }
+  const max = Math.max(1, ...e.ranking_por_vendas.map((l) => l.valor));
+  const linhas = e.ranking_por_vendas.map((l) => `<div class="linha" title="${esc(l.detalhe)}">
+    <div class="rotulo">${esc(l.rotulo.length > 60 ? `${l.rotulo.slice(0, 57)}...` : l.rotulo)}</div>
+    <div class="trilho"><div class="barra" style="width:${Math.max(1.5, (l.valor / max) * 100).toFixed(1)}%"></div><span class="valor">${l.valor.toLocaleString('pt-BR')}</span></div>
+  </div>`).join('\n');
+  return `<h3>Vendas estimadas por ${esc(e.fontes.join(', '))} (${esc(e.periodos.join(', '))})</h3>
+  <p class="suave"><span aria-hidden="true">⚠</span> Estimativas de ${esc(e.fontes.join(', '))}, não transações reais nem dado do Mercado Livre. ${e.produtos_com_estimativa} produto(s) com estimativa.</p>
+  ${linhas}
+  <p class="suave" style="margin-top:12px">O que a API do Mercado Livre devolveu:</p>`;
 }
 
 function tabelaProdutos(m) {
@@ -75,10 +91,10 @@ function tabelaProdutos(m) {
     const alertas = ((p.sinais && p.sinais.regulatorio) || []).map((r) => r.orgao).join(', ');
     return `<tr><td>${esc(p.categoria)}</td><td>${url(p.link) ? `<a href="${url(p.link)}" target="_blank" rel="noopener">${esc(p.nome || p.id)}</a>` : esc(p.nome || p.id)}</td>
 <td class="num">${p.melhor_posicao}º</td><td class="num">${an.menor_preco ? preco(an.menor_preco.valor, an.menor_preco.moeda) : ''}</td>
-<td class="num">${an.quantidade_anuncios !== undefined ? an.quantidade_anuncios : ''}</td><td>${esc(p.marca || '')}</td><td>${esc(alertas)}</td><td class="num">${p.prioridade ? p.prioridade.pontos : ''}</td></tr>`;
+<td class="num">${an.quantidade_anuncios !== undefined ? an.quantidade_anuncios : ''}</td><td class="num">${p.estimativa_externa ? esc(textoDaEstimativa(p.estimativa_externa)) : ''}</td><td>${esc(p.marca || '')}</td><td>${esc(alertas)}</td><td title="${esc(p.ncm ? p.ncm.posicao.map((x) => `${x.codigo} ${x.descricao}`).join(' | ') : '')}">${esc(ncmCurto(p) || '')}</td><td class="num">${p.prioridade ? p.prioridade.pontos : ''}</td></tr>`;
   }).join('\n');
   return `<details class="cartao larga"><summary>Tabela com todos os produtos</summary>
-<div class="rolagem"><table><thead><tr><th>Categoria</th><th>Produto</th><th class="num">Posição</th><th class="num">Menor preço</th><th class="num">Anúncios</th><th>Marca</th><th>Alertas</th><th class="num">Prioridade</th></tr></thead>
+<div class="rolagem"><table><thead><tr><th>Categoria</th><th>Produto</th><th class="num">Posição</th><th class="num">Menor preço</th><th class="num">Anúncios</th><th class="num">Venda estimada</th><th>Marca</th><th>Alertas</th><th>NCM sugerida</th><th class="num">Prioridade</th></tr></thead>
 <tbody>${linhas}</tbody></table></div></details>`;
 }
 
@@ -163,6 +179,7 @@ ${secaoVariacao(ind.variacao)}
 
 <section class="cartao larga">
   <h2>Dados de venda</h2>
+  ${secaoEstimativas(ind.estimativas_externas)}
   ${vendas.length
     ? `<p class="suave">Campos de venda exatamente como a API devolveu.</p><ul>${vendas.map((v) => `<li>${esc(v.nome || v.id)}: ${esc(JSON.stringify(v.campos))}</li>`).join('')}</ul>`
     : '<p class="suave">A API do Mercado Livre não devolveu quantidade vendida para nenhum produto desta mineração. Com o token desta aplicação, os recursos de anúncio e de busca respondem “acesso negado”, e os produtos de catálogo não trazem esse campo. O sinal de demanda disponível é a posição no ranking de mais vendidos e a sua variação entre minerações.</p>'}

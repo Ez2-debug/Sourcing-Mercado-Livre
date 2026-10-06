@@ -15,7 +15,7 @@ const path = require('node:path');
 
 const { ToolError, cleanEnv } = require('./meli');
 const { esc, preco, url } = require('./html');
-const { calcularIndicadores, marcaBarra, selecionarParaAccio } = require('./indicadores');
+const { calcularIndicadores, marcaBarra, selecionarParaAccio, textoDaEstimativa } = require('./indicadores');
 const { painelHtml } = require('./painel');
 
 function pastaMineracoes() {
@@ -161,6 +161,17 @@ function mineracaoAnterior(m) {
   }
 }
 
+// Regrava a mineracao depois de uma alteracao nos produtos (por exemplo o
+// registro de estimativas de terceiros) e refaz o catalogo e o painel.
+function regravarMineracao(m) {
+  const pasta = path.join(pastaMineracoes(), m.id);
+  const indicadores = calcularIndicadores(m, mineracaoAnterior(m));
+  gravar(path.join(pasta, 'mineracao.json'), JSON.stringify(m, null, 2));
+  gravar(path.join(pasta, 'catalogo.html'), catalogoHtml(m));
+  gravar(path.join(pasta, 'painel.html'), painelHtml(m, indicadores));
+  return { painel: path.join(pasta, 'painel.html'), indicadores };
+}
+
 // Recalcula os indicadores de uma mineracao ja gravada e regrava o painel.
 function gerarPainel(m) {
   const indicadores = calcularIndicadores(m, mineracaoAnterior(m));
@@ -242,6 +253,11 @@ function briefingAccio(m, produtos) {
         ? `- Marca no anúncio: ${p.marca} (marca conhecida; cotar apenas equivalente sem marca)`
         : `- Marca no anúncio: ${p.marca} (marca do vendedor; cotar o equivalente sem marca ou OEM)`);
     }
+    if (p.ncm) {
+      const cod = p.ncm.sugestoes.map((s) => s.codigo).join(', ');
+      linhas.push(`- NCM sugerida (conferir com o despachante): posição ${p.ncm.posicao.map((x) => x.codigo).join(' ou ')}${cod ? `; candidatos ${cod}` : ''}`);
+    }
+    if (p.estimativa_externa) linhas.push(`- Venda estimada pela ${p.estimativa_externa.fonte} (estimativa, não dado do Mercado Livre): ${textoDaEstimativa(p.estimativa_externa)}`);
     if (p.atributos && p.atributos.length) {
       linhas.push(`- Atributos: ${p.atributos.slice(0, 8).map((a) => `${a.nome}: ${a.valor}`).join('; ')}`);
     }
@@ -302,6 +318,7 @@ module.exports = {
   gerarPainel,
   pastaAccio,
   pastaMineracoes,
+  regravarMineracao,
   resumirMineracoes,
   salvarMineracao,
   selecionarParaAccio,

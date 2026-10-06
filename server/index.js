@@ -21,12 +21,14 @@ const {
   SEM_VENDAS, categoryId, dropEmpty, findSalesFields, listingsOf, pathForProduct,
   productId, publicLink, summarizeListings, summarizeProduct,
 } = require('./catalogo');
-const { LIMITES, minerarCategoria } = require('./mineracao');
+const { LIMITES, minerarCategoria, todosOsProdutos } = require('./mineracao');
+const { anotarNcm, carregarTabela, sugerirNcm } = require('./ncm');
+const { registrarEstimativas } = require('./estimativas');
 const {
-  carregarMineracao, enviarParaAccio, gerarPainel, resumirMineracoes, salvarMineracao,
+  carregarMineracao, enviarParaAccio, gerarPainel, regravarMineracao, resumirMineracoes, salvarMineracao,
 } = require('./saida');
 
-const SERVER_VERSION = '0.6.0';
+const SERVER_VERSION = '0.7.0';
 const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
 /* ------------------------------------------------------------------ */
@@ -63,6 +65,7 @@ function resumoDaMineracao(m, porCategoria) {
       prioridade: p.prioridade.pontos,
       sem_marca: p.sinais.sem_marca || undefined,
       marca_conhecida: p.sinais.marca_conhecida || undefined,
+      ncm_sugerida: p.ncm ? (p.ncm.sugestoes.length ? p.ncm.sugestoes[0].codigo : `posicao ${p.ncm.posicao[0].codigo}`) : undefined,
       alertas: p.sinais.regulatorio.length ? p.sinais.regulatorio.map((r) => r.orgao) : undefined,
       em_alta: p.tendencias_relacionadas.length ? p.tendencias_relacionadas : undefined,
       detalhe_indisponivel: p.detalhe_indisponivel,
@@ -303,6 +306,7 @@ const TOOLS = [
     async run(args) {
       const id = categoryId(args.categoria_id, true);
       const m = await minerarCategoria(id, args);
+      m.ncm = await anotarNcm(todosOsProdutos(m));
       const arquivos = salvarMineracao(m);
       const out = {
         mineracao_id: arquivos.id,
@@ -312,6 +316,7 @@ const TOOLS = [
         arquivos: { painel_html: arquivos.painel, catalogo_html: arquivos.catalogo, dados_json: arquivos.dados },
         sugestoes: arquivos.indicadores.sugestoes,
         vendas: arquivos.indicadores.vendas.observacao,
+        ncm: arquivos.indicadores.ncm,
         categorias: resumoDaMineracao(m, 8),
         aviso: AVISO_MINERACAO,
       };
@@ -352,6 +357,74 @@ const TOOLS = [
       const m = carregarMineracao(args.mineracao_id);
       const { painel, indicadores } = gerarPainel(m);
       return { painel_html: painel, ...indicadores, aviso: AVISO_MINERACAO };
+    },
+  },
+  {
+    name: 'registrar_vendas_estimadas',
+    description:
+      'Registra em uma mineracao as estimativas de venda de uma fonte externa de inteligencia de mercado (por exemplo o conector JoomPulse), ' +
+      'produto a produto, e regrava o painel com elas. Use depois de consultar a fonte para os produtos minerados. ' +
+      'Os numeros entram como a fonte informou e saem sempre rotulados como estimativa de terceiros, nunca como dado do Mercado Livre.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mineracao_id: { type: 'string', description: 'Opcional. Id devolvido por minerar_categoria; sem ele usa a mineracao mais recente.' },
+        fonte: { type: 'string', description: 'Nome da fonte das estimativas, por exemplo JoomPulse.' },
+        periodo: { type: 'string', enum: ['semanal', 'mensal'], description: 'Padrao semanal. Periodo a que os numeros se referem.' },
+        estimativas: {
+          type: 'array',
+          minItems: 1,
+          description: 'Uma entrada por produto da mineracao.',
+          items: {
+            type: 'object',
+            properties: {
+              produto_id: { type: 'string', description: 'Id do produto na mineracao, por exemplo MLB54982411.' },
+              vendas: { type: 'number', minimum: 0, description: 'Unidades vendidas estimadas no periodo.' },
+              faturamento: { type: 'number', minimum: 0, description: 'Faturamento estimado no periodo, em reais.' },
+              avaliacao: { type: 'number', minimum: 0, description: 'Nota media do produto.' },
+              avaliacoes: { type: 'number', minimum: 0, description: 'Quantidade de avaliacoes.' },
+            },
+            required: ['produto_id'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['fonte', 'estimativas'],
+      additionalProperties: false,
+    },
+    async run(args) {
+      const m = carregarMineracao(args.mineracao_id);
+      const registro = registrarEstimativas(m, args);
+      const { painel, indicadores } = regravarMineracao(m);
+      return { mineracao_id: m.id, ...registro, painel_html: painel, estimativas_externas: indicadores.estimativas_externas };
+    },
+  },
+  {
+    name: 'sugerir_ncm',
+    description:
+      'Sugere a posicao da NCM e ate tres codigos de 8 digitos para um produto, a partir da descricao, usando a tabela oficial ' +
+      'de nomenclatura do Portal Unico Siscomex. E ponto de partida para a classificacao, nao classificacao fiscal: nao informa ' +
+      'aliquotas e precisa ser confirmada com o despachante.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        descricao: { type: 'string', description: 'Nome do produto como no anuncio, comecando pelo tipo do produto.' },
+        material: { type: 'string', description: 'Opcional. Material principal, por exemplo algodao, vidro, aco inox.' },
+      },
+      required: ['descricao'],
+      additionalProperties: false,
+    },
+    async run(args) {
+      const descricao = String(args.descricao === undefined || args.descricao === null ? '' : args.descricao).trim();
+      if (descricao.length < 3) throw new ToolError('Informe a descricao do produto.');
+      let t;
+      try { t = await carregarTabela(); } catch (err) { throw new ToolError(err.message); }
+      const s = sugerirNcm(t, descricao, args.material);
+      const tabela = { vigencia: t.vigencia, ato: t.ato, fonte: 'Portal Unico Siscomex' };
+      if (!s) {
+        return { descricao, sugestao: null, motivo: 'O tipo de produto nao esta no dicionario de posicoes (server/ncm-posicoes.js).', tabela };
+      }
+      return { descricao, ...s, tabela };
     },
   },
   {
@@ -408,6 +481,8 @@ const TOOLS = [
 const INSTRUCTIONS = [
   'Ferramentas de consulta ao Mercado Livre Brasil para apoiar sourcing e importacao (Conecta Hub).',
   'Fluxo usual: listar_categorias -> detalhar_categoria -> minerar_categoria -> painel_indicadores -> enviar_para_accio.',
+  'A NCM sugerida e ponto de partida para o despachante: apresentar sempre como sugestao, sem aliquota.',
+  'Estimativas de venda: se houver um conector de inteligencia de mercado nesta conversa (por exemplo JoomPulse), consultar nele os produtos sugeridos pela mineracao e gravar o resultado com registrar_vendas_estimadas. Apresentar esses numeros sempre como estimativa da fonte, nunca como venda real nem como dado do Mercado Livre.',
   'As sugestoes de produto vem com motivos e ressalvas; apresentar os dois. Minerar a mesma categoria de novo, dias depois, mostra quem subiu e quem desceu no ranking.',
   'Para uma consulta rapida: tendencias e mais_vendidos -> detalhar_produto -> anuncios_do_produto.',
   'Ao apresentar uma mineracao, agrupar por categoria com o nome exatamente como veio (campo categoria) e mostrar a foto de cada categoria e de cada produto.',
