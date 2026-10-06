@@ -21,7 +21,7 @@ const {
   SEM_VENDAS, categoryId, dropEmpty, findSalesFields, listingsOf, pathForProduct,
   productId, publicLink, summarizeListings, summarizeProduct,
 } = require('./catalogo');
-const { LIMITES, minerarCategoria, todosOsProdutos } = require('./mineracao');
+const { LIMITES, completarDatasDeCatalogo, minerarCategoria, todosOsProdutos } = require('./mineracao');
 const { anotarNcm, carregarTabela, sugerirNcm } = require('./ncm');
 const { registrarEstimativas } = require('./estimativas');
 const { salvarNoSupabase, salvarSeConfigurado } = require('./supabase');
@@ -34,7 +34,7 @@ const {
   resumirMineracoes, salvarMineracao,
 } = require('./saida');
 
-const SERVER_VERSION = '0.11.0';
+const SERVER_VERSION = '0.12.0';
 const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
 /* ------------------------------------------------------------------ */
@@ -95,6 +95,16 @@ async function executarMineracao(id, opcoes) {
   m.ncm = await anotarNcm(todosOsProdutos(m));
   const arquivos = salvarMineracao(m);
   return { m, arquivos, supabase: await salvarSeConfigurado(m) };
+}
+
+// Mineracoes gravadas antes da versao 0.12 nao tem a data de catalogo. Busca
+// o que falta e regrava, para a planilha sair completa.
+async function comDatasDeCatalogo(mineracoes) {
+  for (const m of mineracoes) {
+    const feitos = await completarDatasDeCatalogo(todosOsProdutos(m));
+    if (feitos) regravarMineracao(m);
+  }
+  return mineracoes;
 }
 
 // Roda um passo opcional e devolve o erro no resultado em vez de derrubar a ferramenta.
@@ -477,7 +487,7 @@ const TOOLS = [
     name: 'exportar_excel',
     description:
       'Gera uma planilha Excel (.xlsx) com os produtos minerados: foto na celula, nome com link, categoria, posicao, menor preco, ' +
-      'marca, situacao na triagem, alertas, NCM sugerida, prioridade e os links do produto, do menor preco e da foto. ' +
+      'marca, situacao na triagem, alertas, NCM sugerida, prioridade, desde quando esta no catalogo e os links do produto, do menor preco e da foto. ' +
       'Exporta uma mineracao (mineracao_id) ou todas as de um dia (data); sem nenhum dos dois, a mineracao mais recente. ' +
       'Baixa as fotos do Mercado Livre, entao pode levar alguns segundos.',
     inputSchema: {
@@ -495,10 +505,10 @@ const TOOLS = [
         if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new ToolError(`data invalida: "${args.data}". Use AAAA-MM-DD ou "hoje".`);
         const lista = mineracoesDoDia(data);
         if (!lista.length) throw new ToolError(`Nenhuma mineracao gravada em ${data}. Use listar_mineracoes para ver as datas.`);
-        return exportarExcel(lista, data);
+        return exportarExcel(await comDatasDeCatalogo(lista), data);
       }
       const m = carregarMineracao(args.mineracao_id);
-      return exportarExcel([m], m.id);
+      return exportarExcel(await comDatasDeCatalogo([m]), m.id);
     },
   },
   {

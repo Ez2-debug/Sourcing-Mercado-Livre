@@ -16,7 +16,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { ToolError, mapLimit } = require('./meli');
-const { ncmCurto, selecionarParaAccio } = require('./indicadores');
+const { dataParaExcel, ncmCurto, selecionarParaAccio } = require('./indicadores');
 const { ESTILO, medirImagem, montarXlsx } = require('./xlsx');
 const { baixarFoto, gravarPlanilha, pastaPlanilhas } = require('./planilha');
 const { pastaAccio } = require('./saida');
@@ -137,7 +137,7 @@ function localizarSourcing(m, pasta) {
 
 const COLUNAS = [
   ['#', 5], ['Foto Mercado Livre', 14], ['Produto no Mercado Livre', 46], ['Menor preço no Brasil (R$)', 13],
-  ['Posição no ranking', 10], ['NCM sugerida', 15], ['Foto Alibaba', 14], ['Candidato no Alibaba', 46],
+  ['Posição no ranking', 10], ['No catálogo desde', 13], ['NCM sugerida', 15], ['Foto Alibaba', 14], ['Candidato no Alibaba', 46],
   ['Fornecedor', 34], ['Preço do anúncio (US$)', 14], ['MOQ do anúncio', 16], ['Local', 15],
   ['Aderência (Accio)', 11], ['Cruzamento', 16], ['Observação do Accio', 60], ['Link Mercado Livre', 40], ['Link Alibaba', 40],
 ];
@@ -174,7 +174,7 @@ async function planilhaDoSourcing(m, pasta, baixar) {
     const achado = par.get(p.id);
     const c = achado ? achado.candidato : {};
     const an = p.anuncios || {};
-    for (const [dados, col] of [[fotosMl[i], 1], [fotosAli[i], 6]]) {
+    for (const [dados, col] of [[fotosMl[i], 1], [fotosAli[i], 7]]) {
       const im = ancorar(dados, i + 1, col);
       if (im) imagens.push(im);
     }
@@ -186,6 +186,7 @@ async function planilhaDoSourcing(m, pasta, baixar) {
         { v: p.nome, s: ESTILO.link, link: p.link },
         { v: an.menor_preco ? an.menor_preco.valor : undefined, s: ESTILO.dinheiro },
         { v: p.melhor_posicao, s: ESTILO.posicao },
+        { v: dataParaExcel(p.catalogo_desde), s: ESTILO.data },
         { v: ncmCurto(p) || '', s: t },
         { v: '', s: t },
         { v: c.titulo || 'Sem candidato', s: c.link ? ESTILO.link : ESTILO.marca, link: c.link },

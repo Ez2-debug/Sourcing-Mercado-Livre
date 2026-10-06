@@ -134,7 +134,7 @@ O ranking e os termos em alta do Mercado Livre mudam devagar (os termos são sem
 
 ## Planilha Excel
 
-`exportar_excel` gera um `.xlsx` em `~/ConectaHubSourcing/planilhas/` com uma linha por produto: foto na célula, nome com link, categoria, posição, menor preço, marca, situação na triagem (com cor), alertas, NCM sugerida, prioridade e os links do produto, do anúncio mais barato e da foto. Uma segunda aba explica as colunas.
+`exportar_excel` gera um `.xlsx` em `~/ConectaHubSourcing/planilhas/` com uma linha por produto: foto na célula, nome com link, categoria, posição, menor preço, marca, situação na triagem (com cor), alertas, NCM sugerida, prioridade, desde quando está no catálogo e os links do produto, do anúncio mais barato e da foto. Uma segunda aba explica as colunas.
 
 Exporta uma mineração, ou todas as de um dia com `data` (`AAAA-MM-DD` ou `hoje`). Quando a mesma categoria foi minerada mais de uma vez no dia, entra a mais recente. Produtos sem detalhe da API ficam de fora.
 

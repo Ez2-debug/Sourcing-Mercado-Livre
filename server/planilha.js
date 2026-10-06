@@ -13,7 +13,7 @@ const path = require('node:path');
 
 const { ToolError, cleanEnv, mapLimit } = require('./meli');
 const { todosOsProdutos } = require('./mineracao');
-const { marcaBarra, ncmCurto, situacao } = require('./indicadores');
+const { dataParaExcel, marcaBarra, mesesNoCatalogo, ncmCurto, situacao } = require('./indicadores');
 const { ESTILO, medirImagem, montarXlsx } = require('./xlsx');
 
 const LADO = 96; // pixels da foto na celula
@@ -64,7 +64,7 @@ const COLUNAS = [
   ['Foto', 14], ['Produto', 58], ['Categoria no Mercado Livre', 40], ['Posição no ranking', 11],
   ['Menor preço (R$)', 13], ['Anúncios', 10], ['Vendedores', 11], ['Marca no anúncio', 22],
   ['Tipo de marca', 14], ['Situação na triagem', 20], ['Alertas', 14], ['NCM sugerida', 16],
-  ['Prioridade', 11], ['Venda estimada', 22], ['Termos em alta', 26], ['Link do produto', 46],
+  ['Prioridade', 11], ['No catálogo desde', 13], ['Meses no catálogo', 11], ['Venda estimada', 22], ['Termos em alta', 26], ['Link do produto', 46],
   ['Link do menor preço', 46], ['Link da foto', 46], ['Mineração', 26],
 ];
 
@@ -93,6 +93,8 @@ function linhaDoProduto(m, p) {
       { v: p.sinais.regulatorio.map((r) => r.orgao).join(', '), s: t },
       { v: ncmCurto(p) || '', s: t },
       { v: p.prioridade.pontos, s: ESTILO.centro },
+      { v: dataParaExcel(p.catalogo_desde), s: ESTILO.data },
+      { v: mesesNoCatalogo(p, m.consultado_em), s: ESTILO.centro },
       { v: venda, s: t },
       { v: (p.tendencias_relacionadas || []).join(', '), s: t },
       { v: p.link || '', s: p.link ? ESTILO.link : t, link: p.link },
@@ -114,6 +116,7 @@ function abaSobre(mineracoes, total, semDetalhe, comFoto) {
     ['Tipo de marca', 'Conhecida: está na lista de marcas de grande circulação e fica fora da cotação. De vendedor: marca própria do anunciante; cotar o equivalente sem marca. A lista não substitui consulta ao INPI.'],
     ['Alertas', 'Anatel, Anvisa e Inmetro por palavra-chave no nome do produto. Servem de aviso; a exigência real depende do NCM.'],
     ['NCM sugerida', 'Ponto de partida pela descrição do anúncio e pela tabela oficial do Siscomex. Não é classificação fiscal; confirmar com o despachante.'],
+    ['No catálogo desde', 'Data em que a página do produto foi criada no catálogo do Mercado Livre, e há quantos meses isso foi na data da mineração. Não é a data de cada anúncio: essa a API não informa. Produto recente e já no ranking é sinal de subida rápida.'],
     ['Venda estimada', 'Só aparece quando uma fonte externa foi registrada (por exemplo JoomPulse). É estimativa da fonte, não venda real nem dado do Mercado Livre.'],
     ['Links', 'Montados pelo padrão de endereços do site, não devolvidos pela API; algum pode não abrir.'],
     ['Fotos', 'Fotos do catálogo do Mercado Livre, copiadas para dentro da planilha. A coluna Link da foto aponta para a imagem original.'],

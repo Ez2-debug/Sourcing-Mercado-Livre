@@ -134,7 +134,7 @@ function coluna(n) {
 // Indices de estilo (cellXfs) usados pelas celulas.
 const ESTILO = {
   padrao: 0, cabecalho: 1, texto: 2, centro: 3, dinheiro: 4, link: 5, posicao: 6,
-  apto: 7, marca: 8, regulado: 9, proibido: 10, rotulo: 11, nota: 12,
+  apto: 7, marca: 8, regulado: 9, proibido: 10, rotulo: 11, nota: 12, data: 13,
 };
 
 const ESTILOS_XML = `${CAB}<styleSheet xmlns="${NS_MAIN}">
@@ -159,7 +159,7 @@ const ESTILOS_XML = `${CAB}<styleSheet xmlns="${NS_MAIN}">
 <border><left/><right/><top/><bottom style="thin"><color rgb="FFD9D9D9"/></bottom><diagonal/></border>
 </borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="13">
+<cellXfs count="14">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
 <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
@@ -173,6 +173,7 @@ const ESTILOS_XML = `${CAB}<styleSheet xmlns="${NS_MAIN}">
 <xf numFmtId="0" fontId="0" fillId="6" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
 <xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="top"/></xf>
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+<xf numFmtId="14" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
 </cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;

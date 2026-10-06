@@ -45,6 +45,20 @@ function ncmCurto(p) {
   return p.ncm.sugestoes.length ? p.ncm.sugestoes[0].codigo : `posição ${p.ncm.posicao[0].codigo}`;
 }
 
+// Numero de serie do Excel para uma data ISO (dias desde 30/12/1899), no dia UTC.
+function dataParaExcel(iso) {
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? Math.floor(t / 86400000) + 25569 : undefined;
+}
+
+// Meses inteiros entre a entrada do produto no catalogo e a mineracao.
+function mesesNoCatalogo(p, referencia) {
+  const de = Date.parse(p.catalogo_desde);
+  const ate = Date.parse(referencia);
+  if (!Number.isFinite(de) || !Number.isFinite(ate) || ate < de) return undefined;
+  return Math.floor((ate - de) / (30.44 * 86400000));
+}
+
 function textoDaEstimativa(e) {
   const partes = [];
   if (e.vendas !== undefined) partes.push(`${e.vendas.toLocaleString('pt-BR')} un.`);
@@ -107,6 +121,8 @@ function motivos(p) {
   if (p.sinais.sem_marca) lista.push('sem marca registrada');
   const n = p.anuncios && p.anuncios.quantidade_anuncios;
   if (c.poucos_anuncios_concorrentes) lista.push(n === 1 ? 'um único anúncio concorrente' : `só ${n} anúncios concorrentes`);
+  const meses = mesesNoCatalogo(p, p.minerado_em || new Date().toISOString());
+  if (meses !== undefined && meses < 6) lista.push(meses < 1 ? 'entrou no catálogo há menos de um mês' : `no catálogo há só ${meses} ${meses === 1 ? 'mês' : 'meses'}`);
   if (p.estimativa_externa) lista.push(`estimativa da ${p.estimativa_externa.fonte}: ${textoDaEstimativa(p.estimativa_externa)}`);
   return lista;
 }
@@ -258,4 +274,4 @@ function calcularIndicadores(m, anterior) {
   };
 }
 
-module.exports = { calcularIndicadores, comparar, marcaBarra, ncmCurto, selecionarParaAccio, situacao, sugerir, textoDaEstimativa };
+module.exports = { calcularIndicadores, comparar, dataParaExcel, marcaBarra, mesesNoCatalogo, ncmCurto, selecionarParaAccio, situacao, sugerir, textoDaEstimativa };

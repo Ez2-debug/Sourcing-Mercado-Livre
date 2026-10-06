@@ -216,6 +216,10 @@ async function detalharProduto(p) {
     marca: brandOf(cru.attributes),
     familia: cru.family_name,
     dominio: cru.domain_id,
+    // Data em que a pagina do produto foi criada no catalogo. A API nao informa
+    // a data de cada anuncio.
+    catalogo_desde: cru.date_created || undefined,
+    catalogo_atualizado: cru.last_updated || undefined,
     foto: fotos[0],
     fotos: fotos.length > 1 ? fotos : undefined,
     destaques: Array.isArray(cru.main_features)
@@ -345,4 +349,22 @@ function todosOsProdutos(mineracao) {
   return mineracao.categorias.flatMap((c) => c.produtos);
 }
 
-module.exports = { LIMITES, minerarCategoria, norm, sinaisRegulatorios, termosRelacionados, todosOsProdutos };
+// Busca a data de catalogo dos produtos de mineracoes gravadas antes de ela
+// ser guardada. Devolve quantos foram completados.
+async function completarDatasDeCatalogo(produtos) {
+  const faltam = produtos.filter((p) => p.nome && !p.catalogo_desde && String(p.tipo).toUpperCase() === 'PRODUCT');
+  let feitos = 0;
+  await mapLimit(faltam, PARALELO, async (p) => {
+    try {
+      const cru = await apiGet(`/products/${p.id}`);
+      if (cru && cru.date_created) {
+        p.catalogo_desde = cru.date_created;
+        p.catalogo_atualizado = cru.last_updated || undefined;
+        feitos += 1;
+      }
+    } catch (_) { /* segue sem a data */ }
+  });
+  return feitos;
+}
+
+module.exports = { LIMITES, completarDatasDeCatalogo, minerarCategoria, norm, sinaisRegulatorios, termosRelacionados, todosOsProdutos };

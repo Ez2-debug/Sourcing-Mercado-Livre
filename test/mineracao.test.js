@@ -42,7 +42,7 @@ const RANKINGS = {
 const TENDENCIAS = { MLB11: [{ keyword: 'organizador de gaveta', url: 'https://lista.mercadolivre.com.br/x' }] };
 
 const produto = (id, name, marca) => ({
-  id, name, status: 'active', permalink: '', domain_id: 'MLB-X',
+  id, name, status: 'active', permalink: '', domain_id: 'MLB-X', date_created: '2024-01-23T03:41:51Z', last_updated: '2026-05-20T14:26:55Z',
   pictures: [{ url: `http://http2.mlstatic.com/${id}-a.jpg` }, { url: `https://http2.mlstatic.com/${id}-b.jpg` }],
   attributes: marca ? [{ id: 'BRAND', name: 'Marca', value_name: marca }] : [],
   main_features: [{ text: 'Destaque' }],
@@ -379,7 +379,9 @@ test('exporta a planilha Excel com foto, links e a aba de explicacao', async () 
   assert.match(folha, /Organizador De Gaveta Colmeia 12 Nichos/);
   assert.match(folha, /Casa, Móveis e Decoração &gt; Organização para Casa/);
   assert.match(folha, /foto indisponível/);
-  assert.match(folha, /<autoFilter ref="A1:S5"\/>/);
+  assert.match(folha, /<autoFilter ref="A1:U5"\/>/);
+  // 23/01/2024 como numero de serie do Excel, na coluna "No catalogo desde"
+  assert.match(folha, /<c r="N2" s="13"><v>45314<\/v><\/c>/);
   assert.match(folha, /<pane xSplit="2" ySplit="1" topLeftCell="C2"/);
   assert.match(zip['xl/worksheets/_rels/sheet1.xml.rels'].toString('utf8'), /Target="https:\/\/www\.mercadolivre\.com\.br\/p\/MLB100" TargetMode="External"/);
   // a foto 120x60 cabe em 96 px mantendo a proporcao
