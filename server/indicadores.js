@@ -66,6 +66,26 @@ function textoDaEstimativa(e) {
   return `${partes.join(' · ')} por ${e.periodo === 'mensal' ? 'mês' : 'semana'}`;
 }
 
+// Tendencia informada pela fonte externa: "subindo (+18%)", "+18%" ou "subindo".
+function textoDaTendenciaExterna(e) {
+  if (!e) return '';
+  const pct = e.crescimento_percentual === undefined ? '' : `${e.crescimento_percentual > 0 ? '+' : ''}${e.crescimento_percentual.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
+  if (e.tendencia && pct) return `${e.tendencia} (${pct})`;
+  return e.tendencia || pct;
+}
+
+// Tendencia do produto no ranking do Mercado Livre, comparando com a
+// mineracao anterior da mesma categoria. E dado nosso, nao estimativa.
+function tendenciaNoRanking(p, anterior) {
+  if (!anterior) return '';
+  const antes = todosOsProdutos(anterior).find((x) => x.id === p.id);
+  if (!antes) return 'Entrou no ranking';
+  const d = antes.melhor_posicao - p.melhor_posicao;
+  if (d > 0) return `Subiu ${d} (${antes.melhor_posicao}º → ${p.melhor_posicao}º)`;
+  if (d < 0) return `Desceu ${-d} (${antes.melhor_posicao}º → ${p.melhor_posicao}º)`;
+  return 'Estável';
+}
+
 /* ------------------------------------------------------------------ */
 /* Triagem                                                             */
 /* ------------------------------------------------------------------ */
@@ -123,7 +143,10 @@ function motivos(p) {
   if (c.poucos_anuncios_concorrentes) lista.push(n === 1 ? 'um único anúncio concorrente' : `só ${n} anúncios concorrentes`);
   const meses = mesesNoCatalogo(p, p.minerado_em || new Date().toISOString());
   if (meses !== undefined && meses < 6) lista.push(meses < 1 ? 'entrou no catálogo há menos de um mês' : `no catálogo há só ${meses} ${meses === 1 ? 'mês' : 'meses'}`);
-  if (p.estimativa_externa) lista.push(`estimativa da ${p.estimativa_externa.fonte}: ${textoDaEstimativa(p.estimativa_externa)}`);
+  if (p.estimativa_externa) {
+    const tend = textoDaTendenciaExterna(p.estimativa_externa);
+    lista.push(`estimativa da ${p.estimativa_externa.fonte}: ${textoDaEstimativa(p.estimativa_externa)}${tend ? `, tendência ${tend}` : ''}`);
+  }
   return lista;
 }
 
@@ -274,4 +297,4 @@ function calcularIndicadores(m, anterior) {
   };
 }
 
-module.exports = { calcularIndicadores, comparar, dataParaExcel, marcaBarra, mesesNoCatalogo, ncmCurto, selecionarParaAccio, situacao, sugerir, textoDaEstimativa };
+module.exports = { calcularIndicadores, comparar, dataParaExcel, marcaBarra, mesesNoCatalogo, ncmCurto, selecionarParaAccio, situacao, sugerir, tendenciaNoRanking, textoDaEstimativa, textoDaTendenciaExterna };

@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "conecta-hub-sourcing",
   "display_name": "Conecta Hub Sourcing",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Minera produtos do Mercado Livre Brasil por categoria, com fotos, e entrega o resultado ao Accio Work.",
   "long_description": "Extensão local que consulta a API oficial do Mercado Livre com a aplicação Conecta Hub Sourcing. Minera uma categoria e suas subcategorias, cruza o ranking dos mais vendidos com os termos em alta e com os anúncios de cada produto, e agrupa o resultado pelas categorias com o nome e a foto que o site usa. Grava um catálogo HTML e envia os produtos escolhidos para a pasta do Accio Work. O Client Secret fica guardado no seu computador e o token de acesso é renovado automaticamente. A API informa a posição no ranking, não a quantidade vendida.",
   "author": {

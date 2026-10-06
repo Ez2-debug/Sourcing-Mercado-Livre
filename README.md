@@ -116,7 +116,7 @@ O fluxo é:
 2. minerar a categoria;
 3. pedir ao Claude para consultar no JoomPulse os produtos sugeridos e gravar o resultado com `registrar_vendas_estimadas`.
 
-As estimativas ficam em cada produto, com a fonte e o período, e aparecem no painel, nas sugestões e no briefing do Accio Work, sempre rotuladas como estimativa de terceiros. O sistema não calcula nem ajusta esses números, e a prioridade de triagem não os usa.
+As estimativas e a tendência informada pela fonte ficam em cada produto, com a fonte e o período, e aparecem no painel, nas sugestões e no briefing do Accio Work, sempre rotuladas como estimativa de terceiros. O sistema não calcula nem ajusta esses números, e a prioridade de triagem não os usa.
 
 O repositório [joomcode/joompulse-skills](https://github.com/joomcode/joompulse-skills) (MIT) traz skills prontas para o mesmo conector, como produtos sem marca por categoria e nichos sem concorrência.
 

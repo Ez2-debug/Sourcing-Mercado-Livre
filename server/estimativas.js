@@ -46,6 +46,14 @@ function registrarEstimativas(m, entrada) {
       const n = numero(e[campo], campo, id);
       if (n !== undefined) est[campo] = n;
     }
+    // Crescimento no periodo, em pontos percentuais; pode ser negativo.
+    if (e.crescimento_percentual !== undefined && e.crescimento_percentual !== null && e.crescimento_percentual !== '') {
+      const c = Number(e.crescimento_percentual);
+      if (!Number.isFinite(c) || c < -100 || c > 100000) throw new ToolError(`crescimento_percentual invalido para ${id}: "${e.crescimento_percentual}".`);
+      est.crescimento_percentual = c;
+    }
+    const tendencia = String(e.tendencia === undefined || e.tendencia === null ? '' : e.tendencia).trim().slice(0, 60);
+    if (tendencia) est.tendencia = tendencia;
     if (est.vendas === undefined && est.faturamento === undefined) {
       throw new ToolError(`A estimativa de ${id} precisa de "vendas" ou "faturamento".`);
     }

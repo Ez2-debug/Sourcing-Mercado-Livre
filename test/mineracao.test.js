@@ -287,14 +287,14 @@ test('registra estimativas de terceiros e mostra no painel com a fonte', async (
   const gravada = saida.carregarMineracao(arq.id);
   const registro = registrarEstimativas(gravada, {
     fonte: 'JoomPulse',
-    estimativas: [{ produto_id: 'mlb100', vendas: 320, faturamento: 9568 }, { produto_id: 'MLB999', vendas: 5 }],
+    estimativas: [{ produto_id: 'mlb100', vendas: 320, faturamento: 9568, crescimento_percentual: 18.5, tendencia: 'subindo' }, { produto_id: 'MLB999', vendas: 5 }],
   });
   assert.deepEqual([registro.registrados, registro.fora_da_mineracao], [1, ['MLB999']]);
   const { painel, indicadores } = saida.regravarMineracao(gravada);
 
   assert.deepEqual(indicadores.estimativas_externas.fontes, ['JoomPulse']);
   assert.equal(indicadores.estimativas_externas.ranking_por_vendas[0].valor, 320);
-  assert.ok(indicadores.sugestoes[0].motivos.some((x) => /estimativa da JoomPulse: 320 un\. · R\$ 9\.568 por semana/.test(x)));
+  assert.ok(indicadores.sugestoes[0].motivos.some((x) => /estimativa da JoomPulse: 320 un\. · R\$ 9\.568 por semana, tendência subindo \(\+18,5%\)/.test(x)));
   assert.match(fs.readFileSync(painel, 'utf8'), /Estimativas de JoomPulse, não transações reais/);
   assert.equal(saida.carregarMineracao(arq.id).categorias.flatMap((c) => c.produtos).find((p) => p.id === 'MLB100').estimativa_externa.vendas, 320);
 
@@ -379,7 +379,7 @@ test('exporta a planilha Excel com foto, links e a aba de explicacao', async () 
   assert.match(folha, /Organizador De Gaveta Colmeia 12 Nichos/);
   assert.match(folha, /Casa, Móveis e Decoração &gt; Organização para Casa/);
   assert.match(folha, /foto indisponível/);
-  assert.match(folha, /<autoFilter ref="A1:U5"\/>/);
+  assert.match(folha, /<autoFilter ref="A1:W5"\/>/);
   // 23/01/2024 como numero de serie do Excel, na coluna "No catalogo desde"
   assert.match(folha, /<c r="N2" s="13"><v>45314<\/v><\/c>/);
   assert.match(folha, /<pane xSplit="2" ySplit="1" topLeftCell="C2"/);
@@ -442,4 +442,17 @@ test('le o sourcing.md do Accio e cruza candidatos com produtos', () => {
   assert.equal(par.get('MLB67076748').candidato.numero, 2);
   assert.equal(par.has('MLB999'), false);
   assert.deepEqual(sobraram, []);
+});
+
+test('a planilha mostra a tendencia no ranking em relacao a mineracao anterior', () => {
+  const { tendenciaNoRanking, textoDaTendenciaExterna } = require('../server/indicadores');
+  const anterior = { categorias: [{ produtos: [{ id: 'A', melhor_posicao: 5 }, { id: 'B', melhor_posicao: 2 }, { id: 'C', melhor_posicao: 3 }] }] };
+  assert.equal(tendenciaNoRanking({ id: 'A', melhor_posicao: 2 }, anterior), 'Subiu 3 (5º → 2º)');
+  assert.equal(tendenciaNoRanking({ id: 'B', melhor_posicao: 4 }, anterior), 'Desceu 2 (2º → 4º)');
+  assert.equal(tendenciaNoRanking({ id: 'C', melhor_posicao: 3 }, anterior), 'Estável');
+  assert.equal(tendenciaNoRanking({ id: 'D', melhor_posicao: 1 }, anterior), 'Entrou no ranking');
+  assert.equal(tendenciaNoRanking({ id: 'A', melhor_posicao: 2 }, null), '', 'sem mineracao anterior nao ha tendencia');
+  assert.equal(textoDaTendenciaExterna({ crescimento_percentual: -7 }), '-7%');
+  assert.equal(textoDaTendenciaExterna({ tendencia: 'estável' }), 'estável');
+  assert.equal(textoDaTendenciaExterna(undefined), '');
 });

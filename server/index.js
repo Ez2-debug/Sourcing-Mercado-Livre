@@ -34,7 +34,7 @@ const {
   resumirMineracoes, salvarMineracao,
 } = require('./saida');
 
-const SERVER_VERSION = '0.12.0';
+const SERVER_VERSION = '0.13.0';
 const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
 /* ------------------------------------------------------------------ */
@@ -395,7 +395,7 @@ const TOOLS = [
   {
     name: 'registrar_vendas_estimadas',
     description:
-      'Registra em uma mineracao as estimativas de venda de uma fonte externa de inteligencia de mercado (por exemplo o conector JoomPulse), ' +
+      'Registra em uma mineracao as estimativas de venda e a tendencia de uma fonte externa de inteligencia de mercado (por exemplo o conector JoomPulse), ' +
       'produto a produto, e regrava o painel com elas. Use depois de consultar a fonte para os produtos minerados. ' +
       'Os numeros entram como a fonte informou e saem sempre rotulados como estimativa de terceiros, nunca como dado do Mercado Livre.',
     inputSchema: {
@@ -416,6 +416,8 @@ const TOOLS = [
               faturamento: { type: 'number', minimum: 0, description: 'Faturamento estimado no periodo, em reais.' },
               avaliacao: { type: 'number', minimum: 0, description: 'Nota media do produto.' },
               avaliacoes: { type: 'number', minimum: 0, description: 'Quantidade de avaliacoes.' },
+              crescimento_percentual: { type: 'number', description: 'Variacao das vendas no periodo informada pela fonte, em porcento; negativo se caiu.' },
+              tendencia: { type: 'string', description: 'Tendencia informada pela fonte, em poucas palavras: por exemplo subindo, estavel, caindo.' },
             },
             required: ['produto_id'],
             additionalProperties: false,

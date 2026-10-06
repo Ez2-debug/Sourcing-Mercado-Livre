@@ -343,6 +343,7 @@ module.exports = {
   dataLocal,
   gerarPainel,
   listarMineracoes,
+  mineracaoAnterior,
   mineracoesDoDia,
   pastaAccio,
   pastaMineracoes,

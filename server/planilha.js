@@ -13,8 +13,11 @@ const path = require('node:path');
 
 const { ToolError, cleanEnv, mapLimit } = require('./meli');
 const { todosOsProdutos } = require('./mineracao');
-const { dataParaExcel, marcaBarra, mesesNoCatalogo, ncmCurto, situacao } = require('./indicadores');
+const {
+  dataParaExcel, marcaBarra, mesesNoCatalogo, ncmCurto, situacao, tendenciaNoRanking, textoDaTendenciaExterna,
+} = require('./indicadores');
 const { ESTILO, medirImagem, montarXlsx } = require('./xlsx');
+const { mineracaoAnterior } = require('./saida');
 
 const LADO = 96; // pixels da foto na celula
 const ALTURA_DA_LINHA = 76; // pontos; cabe a foto com folga
@@ -64,11 +67,11 @@ const COLUNAS = [
   ['Foto', 14], ['Produto', 58], ['Categoria no Mercado Livre', 40], ['Posição no ranking', 11],
   ['Menor preço (R$)', 13], ['Anúncios', 10], ['Vendedores', 11], ['Marca no anúncio', 22],
   ['Tipo de marca', 14], ['Situação na triagem', 20], ['Alertas', 14], ['NCM sugerida', 16],
-  ['Prioridade', 11], ['No catálogo desde', 13], ['Meses no catálogo', 11], ['Venda estimada', 22], ['Termos em alta', 26], ['Link do produto', 46],
+  ['Prioridade', 11], ['No catálogo desde', 13], ['Meses no catálogo', 11], ['Tendência no ranking', 20], ['Venda estimada', 22], ['Tendência (fonte externa)', 18], ['Termos em alta', 26], ['Link do produto', 46],
   ['Link do menor preço', 46], ['Link da foto', 46], ['Mineração', 26],
 ];
 
-function linhaDoProduto(m, p) {
+function linhaDoProduto(m, p, anterior) {
   const an = p.anuncios || {};
   const mp = an.menor_preco || {};
   const sit = situacao(p);
@@ -95,7 +98,9 @@ function linhaDoProduto(m, p) {
       { v: p.prioridade.pontos, s: ESTILO.centro },
       { v: dataParaExcel(p.catalogo_desde), s: ESTILO.data },
       { v: mesesNoCatalogo(p, m.consultado_em), s: ESTILO.centro },
+      { v: tendenciaNoRanking(p, anterior), s: t },
       { v: venda, s: t },
+      { v: textoDaTendenciaExterna(est), s: t },
       { v: (p.tendencias_relacionadas || []).join(', '), s: t },
       { v: p.link || '', s: p.link ? ESTILO.link : t, link: p.link },
       { v: mp.link || '', s: mp.link ? ESTILO.link : t, link: mp.link },
@@ -117,6 +122,8 @@ function abaSobre(mineracoes, total, semDetalhe, comFoto) {
     ['Alertas', 'Anatel, Anvisa e Inmetro por palavra-chave no nome do produto. Servem de aviso; a exigência real depende do NCM.'],
     ['NCM sugerida', 'Ponto de partida pela descrição do anúncio e pela tabela oficial do Siscomex. Não é classificação fiscal; confirmar com o despachante.'],
     ['No catálogo desde', 'Data em que a página do produto foi criada no catálogo do Mercado Livre, e há quantos meses isso foi na data da mineração. Não é a data de cada anúncio: essa a API não informa. Produto recente e já no ranking é sinal de subida rápida.'],
+    ['Tendência no ranking', 'Compara a posição do produto com a mineração anterior da mesma categoria: entrou, subiu, desceu ou ficou estável. Fica vazia na primeira mineração da categoria. É a posição no ranking do Mercado Livre, não volume de vendas.'],
+    ['Tendência (fonte externa)', 'Tendência ou crescimento informado pela fonte externa de estimativas, quando houver.'],
     ['Venda estimada', 'Só aparece quando uma fonte externa foi registrada (por exemplo JoomPulse). É estimativa da fonte, não venda real nem dado do Mercado Livre.'],
     ['Links', 'Montados pelo padrão de endereços do site, não devolvidos pela API; algum pode não abrir.'],
     ['Fotos', 'Fotos do catálogo do Mercado Livre, copiadas para dentro da planilha. A coluna Link da foto aponta para a imagem original.'],
@@ -142,6 +149,9 @@ async function montarPlanilha(mineracoes, baixar) {
   pares.sort(([, a], [, b]) => a.categoria.localeCompare(b.categoria, 'pt-BR') ||
     b.prioridade.pontos - a.prioridade.pontos || a.melhor_posicao - b.melhor_posicao);
 
+  // A mineracao anterior de cada categoria, para a tendencia no ranking.
+  const anteriores = new Map(mineracoes.map((m) => [m.id, mineracaoAnterior(m)]));
+
   const fotos = await mapLimit(pares, 6, ([, p]) => (p.foto ? (baixar || baixarFoto)(p.foto) : null));
   const imagens = [];
   fotos.forEach((dados, i) => {
@@ -156,7 +166,7 @@ async function montarPlanilha(mineracoes, baixar) {
     });
   });
   const linhas = pares.map(([m, p], i) => {
-    const linha = linhaDoProduto(m, p);
+    const linha = linhaDoProduto(m, p, anteriores.get(m.id));
     if (p.foto && !imagens.some((im) => im.linha === i + 1)) linha.celulas[0].v = 'foto indisponível';
     return linha;
   });
