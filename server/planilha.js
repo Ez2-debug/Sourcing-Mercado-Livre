@@ -67,7 +67,7 @@ const COLUNAS = [
   ['Foto', 14], ['Produto', 58], ['Categoria no Mercado Livre', 40], ['Posição no ranking', 11],
   ['Menor preço (R$)', 13], ['Anúncios', 10], ['Vendedores', 11], ['Marca no anúncio', 22],
   ['Tipo de marca', 14], ['Situação na triagem', 20], ['Alertas', 14], ['NCM sugerida', 16],
-  ['Prioridade', 11], ['No catálogo desde', 13], ['Meses no catálogo', 11], ['Tendência no ranking', 20], ['Venda estimada', 22], ['Tendência (fonte externa)', 18], ['Termos em alta', 26], ['Link do produto', 46],
+  ['Prioridade', 11], ['No catálogo desde', 13], ['Meses no catálogo', 11], ['Tendência no ranking', 20], ['Vendas estimadas (un.)', 12], ['Faturamento estimado (R$)', 14], ['Fonte e período', 18], ['Tendência (fonte externa)', 24], ['Termos em alta', 26], ['Link do produto', 46],
   ['Link do menor preço', 46], ['Link da foto', 46], ['Mineração', 26],
 ];
 
@@ -76,9 +76,8 @@ function linhaDoProduto(m, p, anterior) {
   const mp = an.menor_preco || {};
   const sit = situacao(p);
   const est = p.estimativa_externa;
-  const venda = est
-    ? `${est.vendas !== undefined ? `${est.vendas} un.` : ''}${est.faturamento !== undefined ? ` R$ ${Math.round(est.faturamento)}` : ''} por ${est.periodo === 'mensal' ? 'mês' : 'semana'} (${est.fonte})`.trim()
-    : '';
+  // Numeros em colunas proprias, para a planilha ordenar e filtrar por eles.
+  const fonteEPeriodo = est ? `${est.fonte}, por ${est.periodo === 'mensal' ? 'mês' : 'semana'}` : '';
   const t = ESTILO.texto;
   return {
     altura: ALTURA_DA_LINHA,
@@ -99,7 +98,9 @@ function linhaDoProduto(m, p, anterior) {
       { v: dataParaExcel(p.catalogo_desde), s: ESTILO.data },
       { v: mesesNoCatalogo(p, m.consultado_em), s: ESTILO.centro },
       { v: tendenciaNoRanking(p, anterior), s: t },
-      { v: venda, s: t },
+      { v: est ? est.vendas : undefined, s: ESTILO.centro },
+      { v: est ? est.faturamento : undefined, s: ESTILO.dinheiro },
+      { v: fonteEPeriodo, s: t },
       { v: textoDaTendenciaExterna(est), s: t },
       { v: (p.tendencias_relacionadas || []).join(', '), s: t },
       { v: p.link || '', s: p.link ? ESTILO.link : t, link: p.link },
@@ -124,7 +125,7 @@ function abaSobre(mineracoes, total, semDetalhe, comFoto) {
     ['No catálogo desde', 'Data em que a página do produto foi criada no catálogo do Mercado Livre, e há quantos meses isso foi na data da mineração. Não é a data de cada anúncio: essa a API não informa. Produto recente e já no ranking é sinal de subida rápida.'],
     ['Tendência no ranking', 'Compara a posição do produto com a mineração anterior da mesma categoria: entrou, subiu, desceu ou ficou estável. Fica vazia na primeira mineração da categoria. É a posição no ranking do Mercado Livre, não volume de vendas.'],
     ['Tendência (fonte externa)', 'Tendência ou crescimento informado pela fonte externa de estimativas, quando houver.'],
-    ['Venda estimada', 'Só aparece quando uma fonte externa foi registrada (por exemplo JoomPulse). É estimativa da fonte, não venda real nem dado do Mercado Livre.'],
+    ['Vendas e faturamento estimados', 'Só aparecem quando uma fonte externa foi registrada (por exemplo JoomPulse), no período indicado na coluna ao lado. São estimativas da fonte, calculadas por ela a partir do histórico dos anúncios; não são vendas reais nem dado do Mercado Livre.'],
     ['Links', 'Montados pelo padrão de endereços do site, não devolvidos pela API; algum pode não abrir.'],
     ['Fotos', 'Fotos do catálogo do Mercado Livre, copiadas para dentro da planilha. A coluna Link da foto aponta para a imagem original.'],
   ];

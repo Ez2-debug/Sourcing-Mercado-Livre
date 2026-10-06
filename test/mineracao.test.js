@@ -379,7 +379,7 @@ test('exporta a planilha Excel com foto, links e a aba de explicacao', async () 
   assert.match(folha, /Organizador De Gaveta Colmeia 12 Nichos/);
   assert.match(folha, /Casa, Móveis e Decoração &gt; Organização para Casa/);
   assert.match(folha, /foto indisponível/);
-  assert.match(folha, /<autoFilter ref="A1:W5"\/>/);
+  assert.match(folha, /<autoFilter ref="A1:Y5"\/>/);
   // 23/01/2024 como numero de serie do Excel, na coluna "No catalogo desde"
   assert.match(folha, /<c r="N2" s="13"><v>45314<\/v><\/c>/);
   assert.match(folha, /<pane xSplit="2" ySplit="1" topLeftCell="C2"/);
