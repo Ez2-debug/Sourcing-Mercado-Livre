@@ -24,11 +24,12 @@ const {
 const { LIMITES, minerarCategoria, todosOsProdutos } = require('./mineracao');
 const { anotarNcm, carregarTabela, sugerirNcm } = require('./ncm');
 const { registrarEstimativas } = require('./estimativas');
+const { salvarNoSupabase, salvarSeConfigurado } = require('./supabase');
 const {
   carregarMineracao, enviarParaAccio, gerarPainel, regravarMineracao, resumirMineracoes, salvarMineracao,
 } = require('./saida');
 
-const SERVER_VERSION = '0.7.0';
+const SERVER_VERSION = '0.8.0';
 const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
 /* ------------------------------------------------------------------ */
@@ -317,6 +318,7 @@ const TOOLS = [
         sugestoes: arquivos.indicadores.sugestoes,
         vendas: arquivos.indicadores.vendas.observacao,
         ncm: arquivos.indicadores.ncm,
+        supabase: await salvarSeConfigurado(m),
         categorias: resumoDaMineracao(m, 8),
         aviso: AVISO_MINERACAO,
       };
@@ -396,7 +398,13 @@ const TOOLS = [
       const m = carregarMineracao(args.mineracao_id);
       const registro = registrarEstimativas(m, args);
       const { painel, indicadores } = regravarMineracao(m);
-      return { mineracao_id: m.id, ...registro, painel_html: painel, estimativas_externas: indicadores.estimativas_externas };
+      return {
+        mineracao_id: m.id,
+        ...registro,
+        painel_html: painel,
+        estimativas_externas: indicadores.estimativas_externas,
+        supabase: await salvarSeConfigurado(m),
+      };
     },
   },
   {
@@ -425,6 +433,23 @@ const TOOLS = [
         return { descricao, sugestao: null, motivo: 'O tipo de produto nao esta no dicionario de posicoes (server/ncm-posicoes.js).', tabela };
       }
       return { descricao, ...s, tabela };
+    },
+  },
+  {
+    name: 'salvar_no_supabase',
+    description:
+      'Grava uma mineracao no banco do projeto Supabase configurado na extensao: a mineracao com os indicadores, as categorias e ' +
+      'os produtos com triagem, NCM sugerida e estimativas de terceiros. Rodar de novo atualiza as mesmas linhas. ' +
+      'Com o Supabase configurado, minerar_categoria e registrar_vendas_estimadas ja gravam sozinhas.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mineracao_id: { type: 'string', description: 'Opcional. Id devolvido por minerar_categoria; sem ele usa a mineracao mais recente.' },
+      },
+      additionalProperties: false,
+    },
+    async run(args) {
+      return salvarNoSupabase(carregarMineracao(args.mineracao_id));
     },
   },
   {

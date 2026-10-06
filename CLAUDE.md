@@ -22,6 +22,7 @@ A extensão instalada continua sendo a que o Claude Desktop executa; alteraçõe
 - `server/painel.js` — painel HTML de indicadores (barras em CSS, uma série, um tom).
 - `server/html.js` — escape de texto, URL e preço para as páginas geradas.
 - `server/saida.js` — grava as minerações, gera o catálogo HTML e o pacote do Accio Work.
+- `server/supabase.js` e `supabase/schema.sql` — gravação das minerações no Supabase pela API REST, e as tabelas.
 - `test/` — testes com `node:test` contra uma API simulada.
 
 Sem dependências externas: só módulos do Node (>= 18).
@@ -34,7 +35,8 @@ Sem dependências externas: só módulos do Node (>= 18).
 - Dados de venda: a API responde 403 em `/items` e `/sites/MLB/search` para esta aplicação. Não contornar com raspagem do site; mostrar só o que vier em `campos_de_venda`.
 - NCM é sugestão para o despachante: sem alíquota, e código de 8 dígitos só quando as primeiras palavras da descrição oficial estão no anúncio.
 - Nada em stdout além das mensagens do protocolo; logs vão em stderr.
-- O Client Secret nunca entra no repositório nem em logs.
+- O Client Secret e a chave do Supabase nunca entram no repositório nem em logs. A chave do Supabase só é enviada a `https://<projeto>.supabase.co`.
+- Não fazer engenharia reversa de serviços de terceiros (JoomPulse, Mercado Livre) para obter dados fora dos canais oficiais; usar o conector ou a API que o serviço oferece.
 - `MELI_API_BASE` só aceita endereço local, para o Client Secret não sair para terceiros.
 - A versão aparece em três lugares e precisa andar junto: `manifest.json`, `package.json` e `SERVER_VERSION` em `server/index.js`.
 - Comentários e mensagens das ferramentas em português sem acento, como no código original.

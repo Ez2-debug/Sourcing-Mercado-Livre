@@ -18,13 +18,17 @@
  */
 
 const POSICOES = [
+  // Capa e suporte seguem o material e o uso, nao o produto que protegem:
+  // fora a capinha de celular, ficam sem sugestao.
+  [/capinha|capa (para|de) celular|capa (para|de) iphone/, ['3926']],
+  [/^(kit \d+ )?(capa|suporte)\b/, []],
   // casa e jardim
   [/mangueira/, ['39173']],
   [/espelho/, ['7009']],
   [/cortina|persiana/, ['6303']],
   [/tapete|capacho|passadeira/, ['5703', '5705']],
   [/cobertor|manta\b/, ['6301']],
-  [/edredom|travesseiro|almofada|colchao|colchonete/, ['9404']],
+  [/edredom|travesseiro|almofadas?\b|colchao|colchonete/, ['9404']],
   [/lencol|fronha|jogo de cama|toalha/, ['6302']],
   [/torneira|registro|valvula/, ['8481']],
   [/garrafa termica|copo termico|squeeze termic/, ['9617']],
@@ -60,7 +64,6 @@ const POSICOES = [
   // "celular" so conta abrindo o nome: suporte e capa "de celular" sao outra coisa.
   [/smartwatch|relogio inteligente|^(kit \d+ )?celular|smartphone|telefone|roteador|repetidor|radios? comunicador|walkie/, ['8517']],
   [/relogio/, ['9102']],
-  [/capinha|capa (para|de) celular|capa (para|de) iphone/, ['3926']],
   [/cartao de memoria|pen ?drive|\bssd\b|\bhd externo/, ['8523']],
   [/mouse|teclado|notebook|tablet/, ['8471']],
   [/webcam|camera/, ['8525']],

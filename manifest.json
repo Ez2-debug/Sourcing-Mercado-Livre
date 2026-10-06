@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "conecta-hub-sourcing",
   "display_name": "Conecta Hub Sourcing",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Minera produtos do Mercado Livre Brasil por categoria, com fotos, e entrega o resultado ao Accio Work.",
   "long_description": "Extensão local que consulta a API oficial do Mercado Livre com a aplicação Conecta Hub Sourcing. Minera uma categoria e suas subcategorias, cruza o ranking dos mais vendidos com os termos em alta e com os anúncios de cada produto, e agrupa o resultado pelas categorias com o nome e a foto que o site usa. Grava um catálogo HTML e envia os produtos escolhidos para a pasta do Accio Work. O Client Secret fica guardado no seu computador e o token de acesso é renovado automaticamente. A API informa a posição no ranking, não a quantidade vendida.",
   "author": {
@@ -18,7 +18,9 @@
       ],
       "env": {
         "MELI_CLIENT_SECRET": "${user_config.client_secret}",
-        "ACCIO_WORK_DIR": "${user_config.pasta_accio}"
+        "ACCIO_WORK_DIR": "${user_config.pasta_accio}",
+        "SUPABASE_URL": "${user_config.supabase_url}",
+        "SUPABASE_KEY": "${user_config.supabase_key}"
       }
     }
   },
@@ -68,6 +70,10 @@
       "description": "Sugere a posição e códigos da NCM para um produto, pela tabela oficial do Siscomex."
     },
     {
+      "name": "salvar_no_supabase",
+      "description": "Grava uma mineração no banco do projeto Supabase configurado."
+    },
+    {
       "name": "enviar_para_accio",
       "description": "Envia os produtos de uma mineração para a pasta do Accio Work."
     },
@@ -84,7 +90,8 @@
     "mineração",
     "accio work",
     "ncm",
-    "joompulse"
+    "joompulse",
+    "supabase"
   ],
   "license": "UNLICENSED",
   "compatibility": {
@@ -109,6 +116,19 @@
       "title": "Pasta do Accio Work",
       "description": "Opcional. Pasta onde o Accio Work guarda os trabalhos. Em branco usa a pasta AccioWork dentro da sua pasta de usuário.",
       "required": false
+    },
+    "supabase_url": {
+      "type": "string",
+      "title": "Supabase: endereço do projeto",
+      "description": "Opcional. Project URL do Supabase, no formato https://<projeto>.supabase.co. Com ele e a chave abaixo, cada mineração é gravada no banco.",
+      "required": false
+    },
+    "supabase_key": {
+      "type": "string",
+      "title": "Supabase: chave secreta",
+      "description": "Opcional. Chave secreta (service role) do projeto, em Project Settings > API Keys. Fica guardada só neste computador e só é enviada ao próprio Supabase.",
+      "required": false,
+      "sensitive": true
     }
   }
 }

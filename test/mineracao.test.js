@@ -75,6 +75,8 @@ function rota(url) {
   return undefined;
 }
 
+const SUPABASE = { pedidos: [], semTabela: false };
+
 let servidor;
 let tmp;
 let minerarCategoria;
@@ -86,6 +88,17 @@ before(async () => {
       res.writeHead(status, { 'content-type': 'application/json' });
       res.end(JSON.stringify(corpo));
     };
+    if (req.url.startsWith('/rest/v1/')) {
+      let corpo = '';
+      req.on('data', (d) => { corpo += d; });
+      req.on('end', () => {
+        const tabela = req.url.split('/')[3].split('?')[0];
+        SUPABASE.pedidos.push({ tabela, url: req.url, chave: req.headers.apikey, prefer: req.headers.prefer, linhas: JSON.parse(corpo) });
+        if (SUPABASE.semTabela) return responder(404, { code: 'PGRST205', message: 'Could not find the table in the schema cache' });
+        return responder(201, {});
+      });
+      return undefined;
+    }
     if (req.method === 'POST' && req.url === '/oauth/token') return responder(200, { access_token: 't', expires_in: 21600 });
     if (req.url.startsWith('/user-products/')) return responder(403, { message: 'forbidden' });
     const corpo = rota(req.url);
@@ -288,4 +301,37 @@ test('registra estimativas de terceiros e mostra no painel com a fonte', async (
   assert.throws(() => registrarEstimativas(gravada, { fonte: '', estimativas: [{ produto_id: 'MLB100', vendas: 1 }] }), /Informe a fonte/);
   assert.throws(() => registrarEstimativas(gravada, { fonte: 'X', estimativas: [{ produto_id: 'MLB100', vendas: -1 }] }), /vendas invalido/);
   assert.throws(() => registrarEstimativas(gravada, { fonte: 'X', estimativas: [{ produto_id: 'MLB999', vendas: 1 }] }), /Nenhum produto_id/);
+});
+
+test('grava a mineracao no Supabase e so envia a chave ao proprio Supabase', async () => {
+  const supabase = require('../server/supabase');
+  const m = await minerarCategoria('MLB1', {});
+  m.consultado_em = '2026-03-01T10:00:00.000Z';
+  saida.salvarMineracao(m);
+
+  delete process.env.SUPABASE_URL;
+  delete process.env.SUPABASE_KEY;
+  assert.equal(await supabase.salvarSeConfigurado(m), undefined, 'sem configuracao nada e enviado');
+  await assert.rejects(() => supabase.salvarNoSupabase(m), /nao esta configurado/);
+
+  process.env.SUPABASE_KEY = 'chave-de-teste';
+  process.env.SUPABASE_URL = 'https://exemplo.com';
+  await assert.rejects(() => supabase.salvarNoSupabase(m), /Endereco do Supabase invalido/);
+  assert.equal(SUPABASE.pedidos.length, 0);
+
+  process.env.SUPABASE_URL = process.env.MELI_API_BASE;
+  const r = await supabase.salvarNoSupabase(m);
+  assert.deepEqual([r.categorias, r.produtos], [3, 5]);
+  assert.deepEqual(SUPABASE.pedidos.map((p) => p.tabela), ['chs_mineracoes', 'chs_categorias', 'chs_produtos']);
+  assert.ok(SUPABASE.pedidos.every((p) => p.chave === 'chave-de-teste' && /merge-duplicates/.test(p.prefer)));
+  assert.match(SUPABASE.pedidos[2].url, /on_conflict=mineracao_id,produto_id/);
+  const gaveta = SUPABASE.pedidos[2].linhas.find((l) => l.produto_id === 'MLB100');
+  assert.deepEqual([gaveta.situacao, gaveta.tipo_de_marca, gaveta.menor_preco, gaveta.mineracao_id], ['apto', 'sem_marca', 29.9, m.id]);
+  assert.equal(SUPABASE.pedidos[2].linhas.find((l) => l.produto_id === 'MLBU900').situacao, 'sem_detalhe');
+
+  SUPABASE.semTabela = true;
+  assert.match((await supabase.salvarSeConfigurado(m)).erro, /Rode supabase\/schema\.sql/);
+  SUPABASE.semTabela = false;
+  delete process.env.SUPABASE_URL;
+  delete process.env.SUPABASE_KEY;
 });

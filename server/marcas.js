@@ -60,6 +60,9 @@ function classificarMarca(marca) {
   // "Samsung Galaxy", "Philips Walita": a marca conhecida abre o campo.
   const primeira = m.split(/\s+/)[0];
   if (primeira.length > 2 && CONHECIDAS.has(primeira)) return 'conhecida';
+  // "Alut By Avant": submarca declarada de uma marca conhecida.
+  const dona = m.match(/\bby (.+)$/);
+  if (dona && CONHECIDAS.has(dona[1])) return 'conhecida';
   return 'de_vendedor';
 }
 

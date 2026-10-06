@@ -19,6 +19,7 @@ Roda como extensão do Claude Desktop (formato MCPB) e não tem dependências al
 | `painel_indicadores` | Indicadores, variação no ranking e sugestões de produto de uma mineração. |
 | `registrar_vendas_estimadas` | Grava nos produtos minerados as estimativas de venda de uma fonte externa, como o JoomPulse. |
 | `sugerir_ncm` | Sugere a posição e códigos da NCM para um produto, pela tabela oficial do Siscomex. |
+| `salvar_no_supabase` | Grava uma mineração no banco do projeto Supabase configurado. |
 | `enviar_para_accio` | Envia os produtos de uma mineração para o Accio Work. |
 | `consulta_api` | Diagnóstico: resposta crua de um recurso de catálogo. |
 
@@ -113,6 +114,19 @@ As estimativas ficam em cada produto, com a fonte e o período, e aparecem no pa
 
 O repositório [joomcode/joompulse-skills](https://github.com/joomcode/joompulse-skills) (MIT) traz skills prontas para o mesmo conector, como produtos sem marca por categoria e nichos sem concorrência.
 
+## Banco de dados no Supabase
+
+As minerações podem ser gravadas em um projeto [Supabase](https://supabase.com), para alimentar painéis e outros sistemas.
+
+1. Crie o projeto no Supabase e rode [`supabase/schema.sql`](supabase/schema.sql) no SQL Editor. Ele cria três tabelas: `chs_mineracoes`, `chs_categorias` e `chs_produtos`.
+2. Em Settings > Extensions > Conecta Hub Sourcing > Configure, preencha o endereço do projeto e a chave secreta (service role).
+
+Com isso, `minerar_categoria` e `registrar_vendas_estimadas` gravam sozinhas, e `salvar_no_supabase` envia uma mineração já feita. Gravar de novo atualiza as mesmas linhas.
+
+Cada produto vai com as colunas de triagem (situação, tipo de marca, alertas, prioridade), a NCM sugerida, as estimativas de terceiros e o registro completo em `dados`.
+
+A chave secreta só é enviada a endereços `https://<projeto>.supabase.co`. As tabelas ficam com a segurança por linha ligada e sem políticas: só a chave secreta lê e grava. Para um painel ler os dados com a chave pública, crie políticas de SELECT.
+
 ## Envio para o Accio Work
 
 O Accio Work trabalha sobre pastas do computador. `enviar_para_accio` grava em `~/AccioWork/conecta-hub-mineracao/<id>/`:
@@ -139,6 +153,9 @@ accio-mcp-cli server add --json '{"mcpServers":{"conecta-hub-sourcing":{"command
 | `MELI_CLIENT_ID` | Opcional. Substitui o Client ID embutido. |
 | `ACCIO_WORK_DIR` | Opcional. Pasta do Accio Work; o padrão é `~/AccioWork`. |
 | `CONECTA_HUB_SAIDA` | Opcional. Pasta das minerações; o padrão é `~/ConectaHubSourcing/mineracoes`. |
+| `SUPABASE_URL` | Opcional. Endereço do projeto Supabase. |
+| `SUPABASE_KEY` | Opcional. Chave secreta (service role) do projeto. |
+| `NCM_TABELA` | Só para testes; arquivo local com a tabela de NCM. |
 | `MELI_API_BASE` | Só para testes; aceita apenas `localhost` e `127.0.0.1`. |
 
 Na extensão do Claude Desktop, o Client Secret e a pasta do Accio Work são preenchidos em Settings > Extensions > Conecta Hub Sourcing > Configure.
