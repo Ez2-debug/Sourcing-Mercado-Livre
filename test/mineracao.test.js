@@ -335,3 +335,57 @@ test('grava a mineracao no Supabase e so envia a chave ao proprio Supabase', asy
   delete process.env.SUPABASE_URL;
   delete process.env.SUPABASE_KEY;
 });
+
+// Le as entradas de um ZIP pelo diretorio central, para conferir o .xlsx gerado.
+function lerZip(buf) {
+  const zlib = require('node:zlib');
+  const fim = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  let pos = buf.readUInt32LE(fim + 16);
+  const entradas = {};
+  for (let i = 0; i < buf.readUInt16LE(fim + 10); i += 1) {
+    const metodo = buf.readUInt16LE(pos + 10);
+    const tamanho = buf.readUInt32LE(pos + 20);
+    const nomeLen = buf.readUInt16LE(pos + 28);
+    const local = buf.readUInt32LE(pos + 42);
+    const nome = buf.toString('utf8', pos + 46, pos + 46 + nomeLen);
+    const inicio = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
+    const corpo = buf.subarray(inicio, inicio + tamanho);
+    entradas[nome] = metodo === 8 ? zlib.inflateRawSync(corpo) : corpo;
+    pos += 46 + nomeLen;
+  }
+  return entradas;
+}
+
+test('exporta a planilha Excel com foto, links e a aba de explicacao', async () => {
+  const { montarPlanilha } = require('../server/planilha');
+  const { crc32, medirImagem } = require('../server/xlsx');
+  assert.equal(crc32(Buffer.from('123456789')), 0xCBF43926);
+
+  // JPEG minimo: so o cabecalho com as dimensoes (120 x 60).
+  const jpeg = Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, 0x00, 0x3C, 0x00, 0x78, 0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xD9]);
+  assert.deepEqual(medirImagem(jpeg), { tipo: 'jpeg', altura: 60, largura: 120 });
+
+  const m = await minerarCategoria('MLB1', {});
+  m.id = '20260401-100000-MLB1';
+  const pedidas = [];
+  const r = await montarPlanilha([m], async (u) => { pedidas.push(u); return u.includes('MLB200') ? null : jpeg; });
+  assert.deepEqual([r.produtos, r.com_foto, r.sem_detalhe], [4, 3, 1]);
+  assert.equal(pedidas.length, 4);
+
+  const zip = lerZip(r.buffer);
+  assert.equal(Object.keys(zip)[0], '[Content_Types].xml');
+  assert.equal(Object.keys(zip).filter((n) => n.startsWith('xl/media/')).length, 3);
+  const folha = zip['xl/worksheets/sheet1.xml'].toString('utf8');
+  assert.match(folha, /Organizador De Gaveta Colmeia 12 Nichos/);
+  assert.match(folha, /Casa, Móveis e Decoração &gt; Organização para Casa/);
+  assert.match(folha, /foto indisponível/);
+  assert.match(folha, /<autoFilter ref="A1:S5"\/>/);
+  assert.match(folha, /<pane xSplit="2" ySplit="1" topLeftCell="C2"/);
+  assert.match(zip['xl/worksheets/_rels/sheet1.xml.rels'].toString('utf8'), /Target="https:\/\/www\.mercadolivre\.com\.br\/p\/MLB100" TargetMode="External"/);
+  // a foto 120x60 cabe em 96 px mantendo a proporcao
+  assert.match(zip['xl/drawings/drawing1.xml'].toString('utf8'), /<xdr:ext cx="914400" cy="457200"\/>/);
+  assert.match(zip['xl/worksheets/sheet2.xml'].toString('utf8'), /Não é estimativa de vendas/);
+
+  saida.salvarMineracao(Object.assign(m, { consultado_em: '2026-04-01T10:00:00.000Z' }));
+  assert.deepEqual(saida.mineracoesDoDia(saida.dataLocal('2026-04-01T10:00:00.000Z')).map((x) => x.id), ['20260401-100000-MLB1']);
+});

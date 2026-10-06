@@ -25,11 +25,12 @@ const { LIMITES, minerarCategoria, todosOsProdutos } = require('./mineracao');
 const { anotarNcm, carregarTabela, sugerirNcm } = require('./ncm');
 const { registrarEstimativas } = require('./estimativas');
 const { salvarNoSupabase, salvarSeConfigurado } = require('./supabase');
+const { exportarExcel } = require('./planilha');
 const {
-  carregarMineracao, enviarParaAccio, gerarPainel, regravarMineracao, resumirMineracoes, salvarMineracao,
+  carregarMineracao, dataLocal, enviarParaAccio, gerarPainel, mineracoesDoDia, regravarMineracao, resumirMineracoes, salvarMineracao,
 } = require('./saida');
 
-const SERVER_VERSION = '0.8.0';
+const SERVER_VERSION = '0.9.0';
 const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
 /* ------------------------------------------------------------------ */
@@ -450,6 +451,34 @@ const TOOLS = [
     },
     async run(args) {
       return salvarNoSupabase(carregarMineracao(args.mineracao_id));
+    },
+  },
+  {
+    name: 'exportar_excel',
+    description:
+      'Gera uma planilha Excel (.xlsx) com os produtos minerados: foto na celula, nome com link, categoria, posicao, menor preco, ' +
+      'marca, situacao na triagem, alertas, NCM sugerida, prioridade e os links do produto, do menor preco e da foto. ' +
+      'Exporta uma mineracao (mineracao_id) ou todas as de um dia (data); sem nenhum dos dois, a mineracao mais recente. ' +
+      'Baixa as fotos do Mercado Livre, entao pode levar alguns segundos.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mineracao_id: { type: 'string', description: 'Opcional. Id devolvido por minerar_categoria.' },
+        data: { type: 'string', description: 'Opcional. Dia das mineracoes, no formato AAAA-MM-DD, ou "hoje". Se a mesma categoria foi minerada mais de uma vez no dia, entra a mais recente.' },
+      },
+      additionalProperties: false,
+    },
+    async run(args) {
+      if (args.data !== undefined && args.data !== null && args.data !== '') {
+        const bruto = String(args.data).trim().toLowerCase();
+        const data = bruto === 'hoje' ? dataLocal(new Date().toISOString()) : bruto;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new ToolError(`data invalida: "${args.data}". Use AAAA-MM-DD ou "hoje".`);
+        const lista = mineracoesDoDia(data);
+        if (!lista.length) throw new ToolError(`Nenhuma mineracao gravada em ${data}. Use listar_mineracoes para ver as datas.`);
+        return exportarExcel(lista, data);
+      }
+      const m = carregarMineracao(args.mineracao_id);
+      return exportarExcel([m], m.id);
     },
   },
   {

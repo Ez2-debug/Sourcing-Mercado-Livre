@@ -22,6 +22,7 @@ A extensão instalada continua sendo a que o Claude Desktop executa; alteraçõe
 - `server/painel.js` — painel HTML de indicadores (barras em CSS, uma série, um tom).
 - `server/html.js` — escape de texto, URL e preço para as páginas geradas.
 - `server/saida.js` — grava as minerações, gera o catálogo HTML e o pacote do Accio Work.
+- `server/planilha.js` e `server/xlsx.js` — exportação para Excel com fotos; `xlsx.js` monta o arquivo (ZIP e XML) sem bibliotecas.
 - `server/supabase.js` e `supabase/schema.sql` — gravação das minerações no Supabase pela API REST, e as tabelas.
 - `test/` — testes com `node:test` contra uma API simulada.
 

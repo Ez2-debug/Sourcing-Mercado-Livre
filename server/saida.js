@@ -201,6 +201,28 @@ function carregarMineracao(id) {
   return JSON.parse(fs.readFileSync(path.join(pastaMineracoes(), alvo, 'mineracao.json'), 'utf8'));
 }
 
+function dataLocal(iso) {
+  const d = new Date(iso);
+  const dois = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${dois(d.getMonth() + 1)}-${dois(d.getDate())}`;
+}
+
+// Mineracoes feitas em um dia (AAAA-MM-DD, no horario deste computador). Quando
+// a mesma categoria foi minerada mais de uma vez no dia, fica a mais recente.
+function mineracoesDoDia(data) {
+  const porCategoria = new Map();
+  for (const id of listarMineracoes().slice(0, 200)) {
+    let m;
+    try {
+      m = JSON.parse(fs.readFileSync(path.join(pastaMineracoes(), id, 'mineracao.json'), 'utf8'));
+    } catch (_) { continue; }
+    if (dataLocal(m.consultado_em) !== data) continue;
+    // A lista vem da mais recente para a mais antiga: a primeira de cada categoria vale.
+    if (!porCategoria.has(m.categoria_raiz.id)) porCategoria.set(m.categoria_raiz.id, m);
+  }
+  return Array.from(porCategoria.values());
+}
+
 function resumirMineracoes() {
   return listarMineracoes().slice(0, 30).map((id) => {
     try {
@@ -315,7 +337,9 @@ module.exports = {
   carregarMineracao,
   catalogoHtml,
   enviarParaAccio,
+  dataLocal,
   gerarPainel,
+  mineracoesDoDia,
   pastaAccio,
   pastaMineracoes,
   regravarMineracao,

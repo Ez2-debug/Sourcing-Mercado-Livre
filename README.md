@@ -20,6 +20,7 @@ Roda como extensão do Claude Desktop (formato MCPB) e não tem dependências al
 | `registrar_vendas_estimadas` | Grava nos produtos minerados as estimativas de venda de uma fonte externa, como o JoomPulse. |
 | `sugerir_ncm` | Sugere a posição e códigos da NCM para um produto, pela tabela oficial do Siscomex. |
 | `salvar_no_supabase` | Grava uma mineração no banco do projeto Supabase configurado. |
+| `exportar_excel` | Gera uma planilha Excel com fotos e links dos produtos minerados. |
 | `enviar_para_accio` | Envia os produtos de uma mineração para o Accio Work. |
 | `consulta_api` | Diagnóstico: resposta crua de um recurso de catálogo. |
 
@@ -113,6 +114,14 @@ O fluxo é:
 As estimativas ficam em cada produto, com a fonte e o período, e aparecem no painel, nas sugestões e no briefing do Accio Work, sempre rotuladas como estimativa de terceiros. O sistema não calcula nem ajusta esses números, e a prioridade de triagem não os usa.
 
 O repositório [joomcode/joompulse-skills](https://github.com/joomcode/joompulse-skills) (MIT) traz skills prontas para o mesmo conector, como produtos sem marca por categoria e nichos sem concorrência.
+
+## Planilha Excel
+
+`exportar_excel` gera um `.xlsx` em `~/ConectaHubSourcing/planilhas/` com uma linha por produto: foto na célula, nome com link, categoria, posição, menor preço, marca, situação na triagem (com cor), alertas, NCM sugerida, prioridade e os links do produto, do anúncio mais barato e da foto. Uma segunda aba explica as colunas.
+
+Exporta uma mineração, ou todas as de um dia com `data` (`AAAA-MM-DD` ou `hoje`). Quando a mesma categoria foi minerada mais de uma vez no dia, entra a mais recente. Produtos sem detalhe da API ficam de fora.
+
+O arquivo é montado por `server/xlsx.js`, sem bibliotecas externas. As fotos vêm só do CDN de imagens do Mercado Livre (`mlstatic.com`).
 
 ## Banco de dados no Supabase
 
