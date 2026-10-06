@@ -456,3 +456,28 @@ test('a planilha mostra a tendencia no ranking em relacao a mineracao anterior',
   assert.equal(textoDaTendenciaExterna({ tendencia: 'estável' }), 'estável');
   assert.equal(textoDaTendenciaExterna(undefined), '');
 });
+
+test('monta a consulta do JoomPulse e le a resposta em colunas', async () => {
+  const { consultaJoomPulse, estimativasDoJoomPulse, registrarEstimativas } = require('../server/estimativas');
+  const q = JSON.parse(consultaJoomPulse(['MLB100', 'MLB200']));
+  assert.deepEqual(q.dimensions, ['MlbProductsSortedByProductId.productId']);
+  assert.deepEqual(q.filters[0].values, ['MLB100', 'MLB200']);
+  assert.equal(q.limit, 100);
+
+  const resposta = JSON.stringify({
+    columns: ['productId', 'catalogOrderCount1w', 'catalogOrderGmv1w', 'reviewsCountMax', 'reviewsRating', 'daysInAd'],
+    data: [['MLB100', 843, 37927, 1433, 4.5, 83], ['MLB200', 60, 1372, null, 0, 1174], ['MLB999', 5, 10, 1, 5, 400], [null, 1, 1, 1, 1, 1]],
+  });
+  const est = estimativasDoJoomPulse(resposta);
+  assert.equal(est.length, 3, 'linha sem produto e descartada');
+  assert.deepEqual(est[0], { produto_id: 'MLB100', vendas: 843, faturamento: 37927, avaliacoes: 1433, avaliacao: 4.5, dias_de_anuncio: 83 });
+  assert.deepEqual(est[1], { produto_id: 'MLB200', vendas: 60, faturamento: 1372, dias_de_anuncio: 1174 }, 'nota zero e nulos ficam de fora');
+  assert.throws(() => estimativasDoJoomPulse('nao e json'), /nao e um JSON valido/);
+  assert.throws(() => estimativasDoJoomPulse({ columns: ['productId'], data: [] }), /productId e catalogOrderCount1w/);
+
+  const m = await minerarCategoria('MLB1', {});
+  registrarEstimativas(m, { fonte: 'JoomPulse', estimativas: est });
+  const por = (id) => m.categorias.flatMap((c) => c.produtos).find((p) => p.id === id).estimativa_externa;
+  assert.equal(por('MLB100').tendencia, 'anúncio novo com tração (83 dias)');
+  assert.equal(por('MLB200').tendencia, undefined, 'anuncio antigo fica sem tendencia');
+});

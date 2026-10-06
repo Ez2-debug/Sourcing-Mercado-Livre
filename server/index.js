@@ -23,7 +23,7 @@ const {
 } = require('./catalogo');
 const { LIMITES, completarDatasDeCatalogo, minerarCategoria, todosOsProdutos } = require('./mineracao');
 const { anotarNcm, carregarTabela, sugerirNcm } = require('./ncm');
-const { registrarEstimativas } = require('./estimativas');
+const { MAX_POR_CONSULTA, consultaJoomPulse, estimativasDoJoomPulse, registrarEstimativas } = require('./estimativas');
 const { salvarNoSupabase, salvarSeConfigurado } = require('./supabase');
 const { exportarExcel } = require('./planilha');
 const { definirFila, lerFila, ordenarFila } = require('./fila');
@@ -34,7 +34,7 @@ const {
   resumirMineracoes, salvarMineracao,
 } = require('./saida');
 
-const SERVER_VERSION = '0.13.1';
+const SERVER_VERSION = '0.14.0';
 const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
 /* ------------------------------------------------------------------ */
@@ -105,6 +105,14 @@ async function comDatasDeCatalogo(mineracoes) {
     if (feitos) regravarMineracao(m);
   }
   return mineracoes;
+}
+
+// "hoje" (padrao) ou AAAA-MM-DD, no horario deste computador.
+function resolverData(valor) {
+  const bruto = String(valor === undefined || valor === null || valor === '' ? 'hoje' : valor).trim().toLowerCase();
+  const data = bruto === 'hoje' ? dataLocal(new Date().toISOString()) : bruto;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new ToolError(`data invalida: "${valor}". Use AAAA-MM-DD ou "hoje".`);
+  return data;
 }
 
 // Roda um passo opcional e devolve o erro no resultado em vez de derrubar a ferramenta.
@@ -418,6 +426,7 @@ const TOOLS = [
               avaliacoes: { type: 'number', minimum: 0, description: 'Quantidade de avaliacoes.' },
               crescimento_percentual: { type: 'number', description: 'Variacao das vendas no periodo informada pela fonte, em porcento; negativo se caiu.' },
               tendencia: { type: 'string', description: 'Tendencia informada pela fonte, em poucas palavras: por exemplo subindo, estavel, caindo.' },
+              dias_de_anuncio: { type: 'number', minimum: 0, description: 'Ha quantos dias o anuncio esta no ar, segundo a fonte. Sem tendencia informada, anuncio de ate 180 dias com vendas sai marcado como novo ou recente.' },
             },
             required: ['produto_id'],
             additionalProperties: false,
@@ -437,6 +446,85 @@ const TOOLS = [
         painel_html: painel,
         estimativas_externas: indicadores.estimativas_externas,
         supabase: await salvarSeConfigurado(m),
+      };
+    },
+  },
+  {
+    name: 'preparar_consulta_joompulse',
+    description:
+      'Monta a consulta para o conector JoomPulse (ferramenta query_cubejs_meli) com os produtos de catalogo minerados em um dia que ainda nao ' +
+      'tem estimativa de venda: primeiro os aptos para cotacao, depois os demais, ate 100. Uma consulta cobre todos; a cota do JoomPulse e mensal ' +
+      'e pequena, entao faca no maximo uma por dia. Depois passe a resposta, como veio, para registrar_resposta_joompulse.',
+    inputSchema: {
+      type: 'object',
+      properties: { data: { type: 'string', description: 'Opcional. Dia no formato AAAA-MM-DD, ou "hoje" (padrao).' } },
+      additionalProperties: false,
+    },
+    async run(args) {
+      const data = resolverData(args.data);
+      const pendentes = [];
+      const vistos = new Set();
+      for (const m of mineracoesDoDia(data)) {
+        for (const p of todosOsProdutos(m)) {
+          if (!p.nome || p.estimativa_externa || vistos.has(p.id) || String(p.tipo).toUpperCase() !== 'PRODUCT') continue;
+          vistos.add(p.id);
+          pendentes.push(p);
+        }
+      }
+      pendentes.sort((a, b) => Number(situacao(b) === 'apto') - Number(situacao(a) === 'apto') || b.prioridade.pontos - a.prioridade.pontos);
+      const ids = pendentes.slice(0, MAX_POR_CONSULTA).map((p) => p.id);
+      if (!ids.length) return { data, produtos: 0, observacao: 'Nenhum produto de catalogo sem estimativa neste dia. Nao consulte o JoomPulse.' };
+      return {
+        data,
+        produtos: ids.length,
+        fora_desta_consulta: pendentes.length - ids.length,
+        ferramenta: 'query_cubejs_meli',
+        consulta: consultaJoomPulse(ids),
+        proximo_passo: 'Chame query_cubejs_meli com o campo "query" igual a "consulta" e passe o resultado inteiro para registrar_resposta_joompulse.',
+      };
+    },
+  },
+  {
+    name: 'registrar_resposta_joompulse',
+    description:
+      'Registra a resposta de query_cubejs_meli (JoomPulse) nos produtos minerados em um dia: venda e faturamento semanais estimados, avaliacoes e, ' +
+      'pela idade do anuncio, a tendencia. Regrava paineis e grava no Supabase. Passe a resposta exatamente como veio (JSON com "columns" e "data"). ' +
+      'Os numeros sao estimativas do JoomPulse, nao vendas reais.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        resposta: { type: 'string', description: 'O JSON devolvido por query_cubejs_meli, sem alterar.' },
+        data: { type: 'string', description: 'Opcional. Dia das mineracoes, AAAA-MM-DD ou "hoje" (padrao).' },
+      },
+      required: ['resposta'],
+      additionalProperties: false,
+    },
+    async run(args) {
+      const data = resolverData(args.data);
+      const estimativas = estimativasDoJoomPulse(args.resposta);
+      const lista = mineracoesDoDia(data);
+      if (!lista.length) throw new ToolError(`Nenhuma mineracao gravada em ${data}.`);
+      const usados = new Set();
+      const porMineracao = [];
+      for (const m of lista) {
+        const ids = new Set(todosOsProdutos(m).map((p) => p.id));
+        const doCaso = estimativas.filter((e) => ids.has(e.produto_id));
+        if (!doCaso.length) continue;
+        const r = registrarEstimativas(m, { fonte: 'JoomPulse', periodo: 'semanal', estimativas: doCaso });
+        regravarMineracao(m);
+        for (const e of doCaso) usados.add(e.produto_id);
+        porMineracao.push({ mineracao_id: m.id, categoria: m.categoria_raiz.caminho, registrados: r.registrados, supabase: await salvarSeConfigurado(m) });
+      }
+      if (!porMineracao.length) throw new ToolError(`Nenhum produto da resposta pertence as mineracoes de ${data}.`);
+      return {
+        data,
+        fonte: 'JoomPulse',
+        periodo: 'semanal',
+        produtos_na_resposta: estimativas.length,
+        registrados: usados.size,
+        fora_das_mineracoes_do_dia: estimativas.length - usados.size,
+        mineracoes: porMineracao,
+        aviso: 'Vendas e faturamento sao estimativas do JoomPulse, calculadas por ele a partir do historico dos anuncios; nao sao vendas reais nem dado do Mercado Livre.',
       };
     },
   },
@@ -502,9 +590,7 @@ const TOOLS = [
     },
     async run(args) {
       if (args.data !== undefined && args.data !== null && args.data !== '') {
-        const bruto = String(args.data).trim().toLowerCase();
-        const data = bruto === 'hoje' ? dataLocal(new Date().toISOString()) : bruto;
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new ToolError(`data invalida: "${args.data}". Use AAAA-MM-DD ou "hoje".`);
+        const data = resolverData(args.data);
         const lista = mineracoesDoDia(data);
         if (!lista.length) throw new ToolError(`Nenhuma mineracao gravada em ${data}. Use listar_mineracoes para ver as datas.`);
         return exportarExcel(await comDatasDeCatalogo(lista), data);
@@ -634,9 +720,7 @@ const TOOLS = [
       additionalProperties: false,
     },
     async run(args) {
-      const bruto = String(args.data === undefined || args.data === null || args.data === '' ? 'hoje' : args.data).trim().toLowerCase();
-      const data = bruto === 'hoje' ? dataLocal(new Date().toISOString()) : bruto;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new ToolError(`data invalida: "${args.data}". Use AAAA-MM-DD ou "hoje".`);
+      const data = resolverData(args.data);
       const lista = mineracoesDoDia(data);
       if (!lista.length) return { data, mineracoes: [], observacao: 'Nenhuma mineracao gravada neste dia.' };
       const triagem = { apto: 0, marca_registrada: 0, regulado: 0, proibido: 0, sem_detalhe: 0 };
@@ -662,6 +746,10 @@ const TOOLS = [
           marca: p.marca,
           ncm: p.ncm ? (p.ncm.sugestoes.length ? p.ncm.sugestoes[0].codigo : `posicao ${p.ncm.posicao[0].codigo}`) : undefined,
           prioridade: p.prioridade.pontos,
+          vendas_estimadas_por_semana: p.estimativa_externa ? p.estimativa_externa.vendas : undefined,
+          faturamento_estimado_por_semana: p.estimativa_externa ? p.estimativa_externa.faturamento : undefined,
+          fonte_da_estimativa: p.estimativa_externa ? p.estimativa_externa.fonte : undefined,
+          tendencia: p.estimativa_externa ? p.estimativa_externa.tendencia : undefined,
         })),
         planilha: await tolerante(() => exportarExcel(lista, data)),
         aviso: AVISO_MINERACAO,
@@ -724,7 +812,8 @@ const INSTRUCTIONS = [
   'Fluxo usual: listar_categorias -> detalhar_categoria -> minerar_categoria -> painel_indicadores -> enviar_para_accio.',
   'Mineracao automatica: definir_fila guarda as categorias, minerar_proxima minera a que esta ha mais tempo parada e resumo_do_dia consolida o dia. Tarefas agendadas devem chamar minerar_proxima, uma categoria por execucao.',
   'A NCM sugerida e ponto de partida para o despachante: apresentar sempre como sugestao, sem aliquota.',
-  'Estimativas de venda: se houver um conector de inteligencia de mercado nesta conversa (por exemplo JoomPulse), consultar nele os produtos sugeridos pela mineracao e gravar o resultado com registrar_vendas_estimadas. Apresentar esses numeros sempre como estimativa da fonte, nunca como venda real nem como dado do Mercado Livre.',
+  'Estimativas de venda pelo JoomPulse: preparar_consulta_joompulse monta a consulta do dia, query_cubejs_meli (conector JoomPulse) a executa e registrar_resposta_joompulse grava o resultado. A cota do JoomPulse e mensal e pequena: no maximo uma consulta por dia.',
+  'Estimativas de venda de outra fonte: gravar com registrar_vendas_estimadas. Apresentar esses numeros sempre como estimativa da fonte, nunca como venda real nem como dado do Mercado Livre.',
   'As sugestoes de produto vem com motivos e ressalvas; apresentar os dois. Minerar a mesma categoria de novo, dias depois, mostra quem subiu e quem desceu no ranking.',
   'Para uma consulta rapida: tendencias e mais_vendidos -> detalhar_produto -> anuncios_do_produto.',
   'Ao apresentar uma mineracao, agrupar por categoria com o nome exatamente como veio (campo categoria) e mostrar a foto de cada categoria e de cada produto.',

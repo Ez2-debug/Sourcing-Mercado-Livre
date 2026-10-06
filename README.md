@@ -110,7 +110,11 @@ A sugestão é ponto de partida, não classificação fiscal: o material e a fun
 
 A API do Mercado Livre não informa vendas, mas ferramentas de inteligência de mercado publicam estimativas próprias. O [JoomPulse](https://joompulse.com) oferece um conector MCP (`https://joompulse.com/mcp`) com vendas e faturamento semanais estimados; o acesso exige conta no JoomPulse.
 
-O fluxo é:
+Ferramentas próprias para o JoomPulse: `preparar_consulta_joompulse` monta uma consulta com até 100 produtos de catálogo do dia que ainda não têm estimativa (os aptos primeiro), e `registrar_resposta_joompulse` recebe a resposta do conector como veio e grava venda e faturamento semanais, avaliações e a tendência. A cota do JoomPulse é mensal e pequena (33 consultas no plano testado), por isso a rotina é uma consulta por dia, na tarefa do resumo diário.
+
+A consulta do JoomPulse não traz série de vendas por produto: a venda do mês é a da semana vezes 30/7. A tendência registrada vem da idade do anúncio (até 90 dias e já vendendo: "novo com tração"; até 180: "recente").
+
+O fluxo manual é:
 
 1. conectar o JoomPulse ao Claude (o `.mcp.json` deste repositório já declara o servidor para sessões do Claude Code abertas na pasta; no Claude Desktop, adicione como conector personalizado);
 2. minerar a categoria;
