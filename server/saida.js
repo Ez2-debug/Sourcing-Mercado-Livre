@@ -339,6 +339,7 @@ module.exports = {
   enviarParaAccio,
   dataLocal,
   gerarPainel,
+  listarMineracoes,
   mineracoesDoDia,
   pastaAccio,
   pastaMineracoes,

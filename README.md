@@ -21,6 +21,10 @@ Roda como extensão do Claude Desktop (formato MCPB) e não tem dependências al
 | `sugerir_ncm` | Sugere a posição e códigos da NCM para um produto, pela tabela oficial do Siscomex. |
 | `salvar_no_supabase` | Grava uma mineração no banco do projeto Supabase configurado. |
 | `exportar_excel` | Gera uma planilha Excel com fotos e links dos produtos minerados. |
+| `definir_fila` | Define a fila de categorias da mineração automática. |
+| `ver_fila` | Mostra a fila e a última mineração de cada categoria. |
+| `minerar_proxima` | Minera a categoria da fila que está há mais tempo parada. |
+| `resumo_do_dia` | Resumo das minerações de um dia, com os produtos aptos em destaque. |
 | `enviar_para_accio` | Envia os produtos de uma mineração para o Accio Work. |
 | `consulta_api` | Diagnóstico: resposta crua de um recurso de catálogo. |
 
@@ -114,6 +118,18 @@ O fluxo é:
 As estimativas ficam em cada produto, com a fonte e o período, e aparecem no painel, nas sugestões e no briefing do Accio Work, sempre rotuladas como estimativa de terceiros. O sistema não calcula nem ajusta esses números, e a prioridade de triagem não os usa.
 
 O repositório [joomcode/joompulse-skills](https://github.com/joomcode/joompulse-skills) (MIT) traz skills prontas para o mesmo conector, como produtos sem marca por categoria e nichos sem concorrência.
+
+## Mineração automática
+
+A automação é uma fila de categorias mais uma tarefa agendada no Claude Desktop.
+
+- `definir_fila` grava a lista de categorias em `~/ConectaHubSourcing/fila.json`. Cada categoria pode levar uma `origem`, por exemplo o CNAE de onde veio.
+- `minerar_proxima` minera a categoria que está há mais tempo sem ser minerada, grava no Supabase, atualiza a planilha Excel do dia e, se a fila pedir, grava o pacote do Accio Work. Chamada a cada execução, percorre a fila inteira em rodízio.
+- `resumo_do_dia` consolida as minerações do dia, para o relatório.
+
+A tarefa agendada só precisa dizer "chame `minerar_proxima`". Tarefas agendadas rodam enquanto o Claude Desktop está aberto neste computador; com ele fechado, a execução fica para a próxima abertura.
+
+O ranking e os termos em alta do Mercado Livre mudam devagar (os termos são semanais). Minerar a mesma categoria muitas vezes por dia repete quase os mesmos produtos; o rodízio serve para cobrir mais categorias, não para repetir a mesma.
 
 ## Planilha Excel
 

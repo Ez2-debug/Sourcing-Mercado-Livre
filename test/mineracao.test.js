@@ -389,3 +389,27 @@ test('exporta a planilha Excel com foto, links e a aba de explicacao', async () 
   saida.salvarMineracao(Object.assign(m, { consultado_em: '2026-04-01T10:00:00.000Z' }));
   assert.deepEqual(saida.mineracoesDoDia(saida.dataLocal('2026-04-01T10:00:00.000Z')).map((x) => x.id), ['20260401-100000-MLB1']);
 });
+
+test('a fila confere as categorias e roda em rodizio pela mais antiga', async () => {
+  const fila = require('../server/fila');
+  assert.deepEqual(fila.lerFila().categorias, []);
+
+  const r = await fila.definirFila({
+    categorias: [{ categoria_id: 'mlb11', origem: 'CNAE 4759-8/99' }, { categoria_id: 'MLB13' }, { categoria_id: 'MLB11' }, { categoria_id: 'MLB77777' }],
+    enviar_para_accio: true,
+  });
+  assert.equal(r.total, 2, 'repetida some e inexistente fica de fora');
+  assert.deepEqual(r.categorias_inexistentes, ['MLB77777']);
+  assert.deepEqual(r.categorias[0], { id: 'MLB11', nome: 'Organização para Casa', caminho: 'Casa, Móveis e Decoração > Organização para Casa', origem: 'CNAE 4759-8/99' });
+  assert.equal(fila.lerFila().enviar_para_accio, true);
+
+  const f = fila.lerFila();
+  const ordem = (ids) => fila.ordenarFila(f, ids).map((c) => c.id);
+  assert.deepEqual(ordem([]), ['MLB11', 'MLB13'], 'nunca mineradas seguem a ordem da fila');
+  assert.deepEqual(ordem(['20260102-100000-MLB11']), ['MLB13', 'MLB11'], 'a nunca minerada vem primeiro');
+  assert.deepEqual(ordem(['20260103-100000-MLB13', '20260102-100000-MLB11']), ['MLB11', 'MLB13'], 'depois, a mais antiga');
+  assert.deepEqual(ordem(['20260104-100000-MLB11', '20260103-100000-MLB13', '20260102-100000-MLB11']), ['MLB13', 'MLB11']);
+
+  await assert.rejects(() => fila.definirFila({ categorias: [] }), /ao menos uma categoria/);
+  await assert.rejects(() => fila.definirFila({ categorias: [{ categoria_id: 'MLB77777' }] }), /Nenhuma das categorias existe/);
+});

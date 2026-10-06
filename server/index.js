@@ -26,11 +26,14 @@ const { anotarNcm, carregarTabela, sugerirNcm } = require('./ncm');
 const { registrarEstimativas } = require('./estimativas');
 const { salvarNoSupabase, salvarSeConfigurado } = require('./supabase');
 const { exportarExcel } = require('./planilha');
+const { definirFila, lerFila, ordenarFila } = require('./fila');
+const { calcularIndicadores, situacao } = require('./indicadores');
 const {
-  carregarMineracao, dataLocal, enviarParaAccio, gerarPainel, mineracoesDoDia, regravarMineracao, resumirMineracoes, salvarMineracao,
+  carregarMineracao, dataLocal, enviarParaAccio, gerarPainel, listarMineracoes, mineracoesDoDia, regravarMineracao,
+  resumirMineracoes, salvarMineracao,
 } = require('./saida');
 
-const SERVER_VERSION = '0.9.0';
+const SERVER_VERSION = '0.10.0';
 const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
 /* ------------------------------------------------------------------ */
@@ -83,6 +86,24 @@ const FILTROS_ACCIO = {
 
 function filtrosAccio(args) {
   return { limite: args.limite, incluir_marcas: args.incluir_marcas, incluir_regulados: args.incluir_regulados };
+}
+
+// Minera, sugere NCM, grava em disco e, se configurado, no Supabase.
+async function executarMineracao(id, opcoes) {
+  const m = await minerarCategoria(id, opcoes);
+  m.ncm = await anotarNcm(todosOsProdutos(m));
+  const arquivos = salvarMineracao(m);
+  return { m, arquivos, supabase: await salvarSeConfigurado(m) };
+}
+
+// Roda um passo opcional e devolve o erro no resultado em vez de derrubar a ferramenta.
+async function tolerante(fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    if (!(err instanceof ToolError)) throw err;
+    return { erro: err.message };
+  }
 }
 
 const TOOLS = [
@@ -307,9 +328,7 @@ const TOOLS = [
     },
     async run(args) {
       const id = categoryId(args.categoria_id, true);
-      const m = await minerarCategoria(id, args);
-      m.ncm = await anotarNcm(todosOsProdutos(m));
-      const arquivos = salvarMineracao(m);
+      const { m, arquivos, supabase } = await executarMineracao(id, args);
       const out = {
         mineracao_id: arquivos.id,
         categoria_raiz: m.categoria_raiz,
@@ -319,7 +338,7 @@ const TOOLS = [
         sugestoes: arquivos.indicadores.sugestoes,
         vendas: arquivos.indicadores.vendas.observacao,
         ncm: arquivos.indicadores.ncm,
-        supabase: await salvarSeConfigurado(m),
+        supabase,
         categorias: resumoDaMineracao(m, 8),
         aviso: AVISO_MINERACAO,
       };
@@ -482,6 +501,142 @@ const TOOLS = [
     },
   },
   {
+    name: 'definir_fila',
+    description:
+      'Define a fila de categorias da mineracao automatica, substituindo a anterior. Cada categoria e conferida na API e guardada ' +
+      'com o nome oficial. Use depois de escolher as categorias (por exemplo a partir de uma lista de CNAEs); "origem" guarda de onde cada uma veio.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        categorias: {
+          type: 'array',
+          minItems: 1,
+          items: {
+            type: 'object',
+            properties: {
+              categoria_id: { type: 'string', description: 'Codigo da categoria, por exemplo MLB1574.' },
+              origem: { type: 'string', description: 'Opcional. De onde veio a escolha, por exemplo o CNAE e sua descricao.' },
+            },
+            required: ['categoria_id'],
+            additionalProperties: false,
+          },
+        },
+        enviar_para_accio: { type: 'boolean', description: 'Padrao false. Com true, minerar_proxima tambem grava o pacote na pasta do Accio Work.' },
+      },
+      required: ['categorias'],
+      additionalProperties: false,
+    },
+    async run(args) {
+      return definirFila(args);
+    },
+  },
+  {
+    name: 'ver_fila',
+    description: 'Mostra a fila de categorias da mineracao automatica, na ordem em que serao mineradas, com a ultima mineracao de cada uma.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    async run() {
+      const fila = lerFila();
+      const ordem = ordenarFila(fila, listarMineracoes());
+      return { total: ordem.length, enviar_para_accio: fila.enviar_para_accio, atualizado_em: fila.atualizado_em, proxima: ordem[0] || null, categorias: ordem };
+    },
+  },
+  {
+    name: 'minerar_proxima',
+    description:
+      'Passo da mineracao automatica: minera a categoria da fila que esta ha mais tempo sem ser minerada, grava no Supabase (se configurado), ' +
+      'atualiza a planilha Excel do dia e, se a fila pedir, grava o pacote do Accio Work. Feita para tarefas agendadas: basta chamar a cada execucao ' +
+      'que a fila roda inteira. Devolve um resumo curto; o detalhe fica no painel. Pode levar de um a tres minutos.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        profundidade: { type: 'integer', minimum: LIMITES.profundidade.min, maximum: LIMITES.profundidade.max, description: 'Padrao 1.' },
+        max_produtos: { type: 'integer', minimum: LIMITES.max_produtos.min, maximum: LIMITES.max_produtos.max, description: 'Padrao 40.' },
+      },
+      additionalProperties: false,
+    },
+    async run(args) {
+      const fila = lerFila();
+      if (!fila.categorias.length) throw new ToolError('A fila esta vazia. Use definir_fila para escolher as categorias da mineracao automatica.');
+      const ordem = ordenarFila(fila, listarMineracoes());
+      const alvo = ordem[0];
+      const { m, arquivos, supabase } = await executarMineracao(alvo.id, { profundidade: args.profundidade, max_produtos: args.max_produtos });
+      const hoje = dataLocal(m.consultado_em);
+      const out = {
+        mineracao_id: m.id,
+        categoria: alvo.caminho,
+        origem: alvo.origem,
+        resumo: m.resumo,
+        triagem: arquivos.indicadores.triagem,
+        sugestoes: arquivos.indicadores.sugestoes.slice(0, 5).map((s) => ({ nome: s.nome, link: s.link, menor_preco: s.menor_preco, apto: s.apto, ncm: s.ncm })),
+        variacao: arquivos.indicadores.variacao
+          ? {
+            desde: arquivos.indicadores.variacao.consultado_em,
+            subiram: arquivos.indicadores.variacao.subiram.length,
+            desceram: arquivos.indicadores.variacao.desceram.length,
+            entraram: arquivos.indicadores.variacao.novos.length,
+            sairam: arquivos.indicadores.variacao.sairam.length,
+          }
+          : null,
+        painel_html: arquivos.painel,
+        supabase,
+        planilha_do_dia: await tolerante(() => exportarExcel(mineracoesDoDia(hoje), hoje)),
+        proxima_da_fila: (ordem[1] || alvo).caminho,
+        categorias_na_fila: ordem.length,
+        aviso: AVISO_MINERACAO,
+      };
+      if (fila.enviar_para_accio) out.accio = await tolerante(() => enviarParaAccio(m, {}));
+      return out;
+    },
+  },
+  {
+    name: 'resumo_do_dia',
+    description:
+      'Resumo das mineracoes de um dia, para relatorios: categorias mineradas, triagem somada, os produtos aptos mais bem priorizados e o ' +
+      'caminho da planilha Excel do dia (que e regravada). Quando a mesma categoria foi minerada mais de uma vez, conta a mais recente.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: { type: 'string', description: 'Opcional. Dia no formato AAAA-MM-DD, ou "hoje" (padrao).' },
+        sugestoes: { type: 'integer', minimum: 1, maximum: 30, description: 'Padrao 10. Quantos produtos aptos listar.' },
+      },
+      additionalProperties: false,
+    },
+    async run(args) {
+      const bruto = String(args.data === undefined || args.data === null || args.data === '' ? 'hoje' : args.data).trim().toLowerCase();
+      const data = bruto === 'hoje' ? dataLocal(new Date().toISOString()) : bruto;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new ToolError(`data invalida: "${args.data}". Use AAAA-MM-DD ou "hoje".`);
+      const lista = mineracoesDoDia(data);
+      if (!lista.length) return { data, mineracoes: [], observacao: 'Nenhuma mineracao gravada neste dia.' };
+      const triagem = { apto: 0, marca_registrada: 0, regulado: 0, proibido: 0, sem_detalhe: 0 };
+      const aptos = [];
+      const mineracoes = lista.map((m) => {
+        const ind = calcularIndicadores(m, null);
+        for (const k of Object.keys(triagem)) triagem[k] += ind.triagem[k];
+        for (const p of todosOsProdutos(m)) if (situacao(p) === 'apto') aptos.push(p);
+        return { id: m.id, categoria: m.categoria_raiz.caminho, consultado_em: m.consultado_em, produtos: ind.totais.produtos, aptos: ind.triagem.apto };
+      });
+      aptos.sort((a, b) => b.prioridade.pontos - a.prioridade.pontos || a.melhor_posicao - b.melhor_posicao);
+      const n = Number.isInteger(args.sugestoes) ? args.sugestoes : 10;
+      return {
+        data,
+        mineracoes,
+        triagem,
+        produtos_aptos_em_destaque: aptos.slice(0, n).map((p) => dropEmpty({
+          nome: p.nome,
+          categoria: p.categoria,
+          link: p.link,
+          posicao: p.melhor_posicao,
+          menor_preco: p.anuncios && p.anuncios.menor_preco ? p.anuncios.menor_preco.valor : undefined,
+          marca: p.marca,
+          ncm: p.ncm ? (p.ncm.sugestoes.length ? p.ncm.sugestoes[0].codigo : `posicao ${p.ncm.posicao[0].codigo}`) : undefined,
+          prioridade: p.prioridade.pontos,
+        })),
+        planilha: await tolerante(() => exportarExcel(lista, data)),
+        aviso: AVISO_MINERACAO,
+      };
+    },
+  },
+  {
     name: 'enviar_para_accio',
     description:
       'Envia os produtos de uma mineracao ja gravada para o Accio Work: grava na pasta do Accio um briefing de sourcing ' +
@@ -535,6 +690,7 @@ const TOOLS = [
 const INSTRUCTIONS = [
   'Ferramentas de consulta ao Mercado Livre Brasil para apoiar sourcing e importacao (Conecta Hub).',
   'Fluxo usual: listar_categorias -> detalhar_categoria -> minerar_categoria -> painel_indicadores -> enviar_para_accio.',
+  'Mineracao automatica: definir_fila guarda as categorias, minerar_proxima minera a que esta ha mais tempo parada e resumo_do_dia consolida o dia. Tarefas agendadas devem chamar minerar_proxima, uma categoria por execucao.',
   'A NCM sugerida e ponto de partida para o despachante: apresentar sempre como sugestao, sem aliquota.',
   'Estimativas de venda: se houver um conector de inteligencia de mercado nesta conversa (por exemplo JoomPulse), consultar nele os produtos sugeridos pela mineracao e gravar o resultado com registrar_vendas_estimadas. Apresentar esses numeros sempre como estimativa da fonte, nunca como venda real nem como dado do Mercado Livre.',
   'As sugestoes de produto vem com motivos e ressalvas; apresentar os dois. Minerar a mesma categoria de novo, dias depois, mostra quem subiu e quem desceu no ranking.',

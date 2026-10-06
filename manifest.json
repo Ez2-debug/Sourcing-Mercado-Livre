@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "conecta-hub-sourcing",
   "display_name": "Conecta Hub Sourcing",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Minera produtos do Mercado Livre Brasil por categoria, com fotos, e entrega o resultado ao Accio Work.",
   "long_description": "Extensão local que consulta a API oficial do Mercado Livre com a aplicação Conecta Hub Sourcing. Minera uma categoria e suas subcategorias, cruza o ranking dos mais vendidos com os termos em alta e com os anúncios de cada produto, e agrupa o resultado pelas categorias com o nome e a foto que o site usa. Grava um catálogo HTML e envia os produtos escolhidos para a pasta do Accio Work. O Client Secret fica guardado no seu computador e o token de acesso é renovado automaticamente. A API informa a posição no ranking, não a quantidade vendida.",
   "author": {
@@ -78,6 +78,22 @@
       "description": "Gera uma planilha Excel com fotos e links dos produtos minerados."
     },
     {
+      "name": "definir_fila",
+      "description": "Define a fila de categorias da mineração automática."
+    },
+    {
+      "name": "ver_fila",
+      "description": "Mostra a fila de categorias e a última mineração de cada uma."
+    },
+    {
+      "name": "minerar_proxima",
+      "description": "Minera a categoria da fila que está há mais tempo parada e atualiza a planilha do dia."
+    },
+    {
+      "name": "resumo_do_dia",
+      "description": "Resumo das minerações de um dia, com os produtos aptos em destaque."
+    },
+    {
       "name": "enviar_para_accio",
       "description": "Envia os produtos de uma mineração para a pasta do Accio Work."
     },
@@ -96,7 +112,8 @@
     "ncm",
     "joompulse",
     "supabase",
-    "excel"
+    "excel",
+    "automação"
   ],
   "license": "UNLICENSED",
   "compatibility": {
