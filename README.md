@@ -25,6 +25,7 @@ Roda como extensão do Claude Desktop (formato MCPB) e não tem dependências al
 | `ver_fila` | Mostra a fila e a última mineração de cada categoria. |
 | `minerar_proxima` | Minera a categoria da fila que está há mais tempo parada. |
 | `resumo_do_dia` | Resumo das minerações de um dia, com os produtos aptos em destaque. |
+| `planilha_do_sourcing` | Planilha com os candidatos que o Accio Work encontrou no Alibaba para cada produto. |
 | `enviar_para_accio` | Envia os produtos de uma mineração para o Accio Work. |
 | `consulta_api` | Diagnóstico: resposta crua de um recurso de catálogo. |
 
@@ -163,6 +164,14 @@ O Accio Work trabalha sobre pastas do computador. `enviar_para_accio` grava em `
 A ferramenta devolve o pedido pronto para colar no Accio Work, apontando para essa pasta.
 
 Por padrão ficam de fora os produtos de marca conhecida e os que têm alerta regulatório; `incluir_marcas` e `incluir_regulados` afrouxam o filtro. Produto proibido nunca é enviado.
+
+### Planilha do resultado
+
+Depois que o Accio termina a busca, ele grava um `sourcing.md` com a tabela de candidatos. `planilha_do_sourcing` lê esse arquivo e gera `~/ConectaHubSourcing/planilhas/sourcing-<id>.xlsx`, com cada produto minerado ao lado do candidato do Alibaba: as duas fotos, fornecedor, preço e MOQ do anúncio, local, aderência e links.
+
+O briefing pede ao Accio que cite o código do produto (`MLB...`) em cada candidato. Quando ele cita, o cruzamento é exato; quando não, é feito pelas palavras em comum e sai marcado como "Por semelhança; conferir".
+
+Preço de anúncio não é cotação FOB. Iniciar a tarefa dentro do Accio continua sendo manual.
 
 O Accio Work também aceita servidores MCP personalizados. Para os agentes dele chamarem estas ferramentas direto, registre o servidor pela linha de comando do Accio. O comando abaixo segue a documentação do `accio-mcp-cli` e ainda não foi testado neste projeto:
 

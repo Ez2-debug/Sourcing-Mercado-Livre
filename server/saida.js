@@ -251,6 +251,8 @@ function briefingAccio(m, produtos) {
     'Monte a comparação com preço FOB, MOQ, prazo de produção, certificações e verificação do fornecedor.',
     'O preço de referência é o menor anúncio no Mercado Livre, em reais e já com impostos e frete; ele não é o preço alvo de compra.',
     '',
+    'Em toda tabela de resultados, cite na coluna de motivo o código do produto correspondente (por exemplo MLB12345678), para que cada candidato possa ser ligado ao produto de origem.',
+    '',
     '## Restrições',
     '',
     '- Não cotar item de marca registrada nem réplica; buscar produto sem marca ou com possibilidade de marca própria (OEM/ODM).',
@@ -265,6 +267,7 @@ function briefingAccio(m, produtos) {
     const an = p.anuncios || {};
     linhas.push(`### ${i + 1}. ${p.nome}`, '');
     if (p.foto) linhas.push(`![${p.nome.replace(/[\[\]]/g, '')}](${p.foto})`, '');
+    linhas.push(`- Código do produto: ${p.id}`);
     linhas.push(`- Categoria no Mercado Livre: ${p.categoria}`);
     linhas.push(`- Posição no ranking da categoria: ${p.melhor_posicao}º`);
     if (an.menor_preco) linhas.push(`- Preço de referência no Brasil: ${preco(an.menor_preco.valor, an.menor_preco.moeda)} (${an.quantidade_anuncios} anúncio(s))`);

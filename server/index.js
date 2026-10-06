@@ -27,13 +27,14 @@ const { registrarEstimativas } = require('./estimativas');
 const { salvarNoSupabase, salvarSeConfigurado } = require('./supabase');
 const { exportarExcel } = require('./planilha');
 const { definirFila, lerFila, ordenarFila } = require('./fila');
+const { planilhaDoSourcing } = require('./sourcing');
 const { calcularIndicadores, situacao } = require('./indicadores');
 const {
   carregarMineracao, dataLocal, enviarParaAccio, gerarPainel, listarMineracoes, mineracoesDoDia, regravarMineracao,
   resumirMineracoes, salvarMineracao,
 } = require('./saida');
 
-const SERVER_VERSION = '0.10.0';
+const SERVER_VERSION = '0.11.0';
 const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
 /* ------------------------------------------------------------------ */
@@ -498,6 +499,25 @@ const TOOLS = [
       }
       const m = carregarMineracao(args.mineracao_id);
       return exportarExcel([m], m.id);
+    },
+  },
+  {
+    name: 'planilha_do_sourcing',
+    description:
+      'Gera a planilha Excel do sourcing feito pelo Accio Work para uma mineracao: cada produto minerado ao lado do candidato que o Accio ' +
+      'encontrou no Alibaba, com as duas fotos, fornecedor, preco e MOQ do anuncio, aderencia e links. Le o sourcing.md que o Accio grava; ' +
+      'use depois que o Accio terminar a busca. Preco de anuncio nao e cotacao FOB.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mineracao_id: { type: 'string', description: 'Opcional. Id da mineracao cujo pacote foi para o Accio; sem ele usa a mais recente.' },
+        pasta: { type: 'string', description: 'Opcional. Pasta do plano do Accio (dentro da pasta do Accio Work) onde esta o sourcing.md. Sem ela, procura na pasta do pacote e depois no plano mais recente.' },
+      },
+      additionalProperties: false,
+    },
+    async run(args) {
+      const pasta = args.pasta === undefined || args.pasta === null ? '' : String(args.pasta).trim();
+      return planilhaDoSourcing(carregarMineracao(args.mineracao_id), pasta || undefined);
     },
   },
   {

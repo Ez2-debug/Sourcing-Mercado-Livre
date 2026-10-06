@@ -36,12 +36,13 @@ function pastaPlanilhas() {
   return path.join(base ? path.dirname(base) : path.join(os.homedir(), 'ConectaHubSourcing'), 'planilhas');
 }
 
-// So baixa do CDN de imagens do Mercado Livre. A versao "-O" (500 px) basta
-// para a celula e pesa bem menos que a foto cheia ("-F").
+// So baixa dos CDNs de imagens do Mercado Livre e do Alibaba. No Mercado
+// Livre, a versao "-O" (500 px) basta para a celula e pesa bem menos que a
+// foto cheia ("-F").
 async function baixarFoto(endereco) {
   let u;
   try { u = new URL(endereco); } catch (_) { return null; }
-  if (u.protocol !== 'https:' || !/(^|\.)mlstatic\.com$/.test(u.hostname)) return null;
+  if (u.protocol !== 'https:' || !/(^|\.)(mlstatic|alicdn)\.com$/.test(u.hostname)) return null;
   const tentativas = [endereco.replace(/-F\.jpg$/, '-O.jpg'), endereco];
   for (const alvo of tentativas) {
     try {
@@ -164,20 +165,30 @@ async function montarPlanilha(mineracoes, baixar) {
   return { buffer, produtos: pares.length, com_foto: imagens.length, sem_detalhe: semDetalhe };
 }
 
-async function exportarExcel(mineracoes, nomeBase, baixar) {
-  const r = await montarPlanilha(mineracoes, baixar);
-  const arquivo = path.join(pastaPlanilhas(), `produtos-${nomeBase}.xlsx`);
+// Grava a planilha. Se o arquivo estiver aberto no Excel, grava ao lado com a
+// hora no nome em vez de falhar: a mineracao automatica nao pode parar por isso.
+function gravarPlanilha(arquivo, buffer) {
   fs.mkdirSync(path.dirname(arquivo), { recursive: true });
   try {
-    fs.writeFileSync(arquivo, r.buffer);
+    fs.writeFileSync(arquivo, buffer);
+    return arquivo;
   } catch (err) {
-    if (err.code === 'EBUSY' || err.code === 'EPERM') {
-      throw new ToolError(`Nao consegui gravar ${arquivo}: o arquivo esta aberto no Excel. Feche-o e tente de novo.`);
-    }
-    throw err;
+    if (err.code !== 'EBUSY' && err.code !== 'EPERM') throw err;
+    const d = new Date();
+    const hora = `${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
+    const alternativo = arquivo.replace(/\.xlsx$/, `-${hora}.xlsx`);
+    fs.writeFileSync(alternativo, buffer);
+    return alternativo;
   }
+}
+
+async function exportarExcel(mineracoes, nomeBase, baixar) {
+  const r = await montarPlanilha(mineracoes, baixar);
+  const pedido = path.join(pastaPlanilhas(), `produtos-${nomeBase}.xlsx`);
+  const arquivo = gravarPlanilha(pedido, r.buffer);
   return {
     arquivo,
+    observacao: arquivo !== pedido ? `${path.basename(pedido)} estava aberto no Excel; gravei em outro arquivo.` : undefined,
     mineracoes: mineracoes.map((m) => m.id),
     produtos: r.produtos,
     com_foto: r.com_foto,
@@ -185,4 +196,4 @@ async function exportarExcel(mineracoes, nomeBase, baixar) {
   };
 }
 
-module.exports = { exportarExcel, montarPlanilha, pastaPlanilhas };
+module.exports = { baixarFoto, exportarExcel, gravarPlanilha, montarPlanilha, pastaPlanilhas };

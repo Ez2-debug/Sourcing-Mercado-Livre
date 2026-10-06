@@ -413,3 +413,31 @@ test('a fila confere as categorias e roda em rodizio pela mais antiga', async ()
   await assert.rejects(() => fila.definirFila({ categorias: [] }), /ao menos uma categoria/);
   await assert.rejects(() => fila.definirFila({ categorias: [{ categoria_id: 'MLB77777' }] }), /Nenhuma das categorias existe/);
 });
+
+test('le o sourcing.md do Accio e cruza candidatos com produtos', () => {
+  const { cruzar, lerSourcingMd } = require('../server/sourcing');
+  const md = [
+    '| # | Image | Product/Supplier | Supplier | Price / MOQ | Location | Match | Recommendation reason |',
+    '|---|---|---|---|---|---|---|---|',
+    '| 1 | ![](https://s.alicdn.com/a.jpg) | [Mattress Cover Waterproof Quilted](https://www.alibaba.com/product-detail/x_1.html) | Yiwu Qibei Co., Ltd. | $2.10-7.32 / 2 pieces | Zhejiang, CN | 88/100 | Equivalente ao protetor de colchão impermeável matelado. |',
+    '| 2 | ![](https://s.alicdn.com/b.jpg) | [Rodízios Giratórios para Móveis](https://www.alibaba.com/product-detail/x_2.html) | Jiangmen Baolan Co., Ltd. | $3 / 8 Pieces | Guangdong, CN | 84/100 | Kit com 8 rodízios e freio. |',
+    '| 3 | ![](https://s.alicdn.com/c.jpg) | [LED Fairy Light](https://www.alibaba.com/product-detail/x_3.html) | Shenzhen My Fashion Ltd. | $0.32 / 2000 Pieces | Guangdong, CN | 84/100 | Atende ao produto MLB53507162. |',
+  ].join('\n');
+  const candidatos = lerSourcingMd(md);
+  assert.equal(candidatos.length, 3);
+  assert.deepEqual([candidatos[0].preco, candidatos[0].moq, candidatos[0].fornecedor], ['$2.10-7.32', '2 pieces', 'Yiwu Qibei Co., Ltd.']);
+  assert.equal(candidatos[1].link, 'https://www.alibaba.com/product-detail/x_2.html');
+
+  const produtos = [
+    { id: 'MLB53507162', nome: 'Kit 10 Fio Fada Cordão Luz' },
+    { id: 'MLB47426343', nome: 'Capa Protetora Colchão Box Casal Matelado Impermeável' },
+    { id: 'MLB67076748', nome: 'Kit 8 Rodinhas Para Moveis Rodízio Giratória' },
+    { id: 'MLB999', nome: 'Cadeira Escritório Ergonômica' },
+  ];
+  const { par, sobraram } = cruzar(produtos, candidatos);
+  assert.deepEqual([par.get('MLB53507162').candidato.numero, par.get('MLB53507162').exato], [3, true], 'pelo codigo');
+  assert.deepEqual([par.get('MLB47426343').candidato.numero, par.get('MLB47426343').exato], [1, false], 'por semelhanca');
+  assert.equal(par.get('MLB67076748').candidato.numero, 2);
+  assert.equal(par.has('MLB999'), false);
+  assert.deepEqual(sobraram, []);
+});
