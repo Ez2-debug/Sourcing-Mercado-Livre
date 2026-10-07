@@ -27,7 +27,7 @@ function centralHtml() {
   main { max-width:1180px; margin:0 auto; padding:16px; }
   h2 { font-size:16px; margin:0 0 2px; }
   a { color:var(--link); text-decoration:none; } a:hover { text-decoration:underline; }
-  .suave { color:var(--tinta2); font-size:13px; margin:0; }
+  .suave { color:var(--tinta2); font-size:13px; margin:0; overflow-wrap:anywhere; }
   button { font:inherit; font-size:14px; padding:7px 14px; border-radius:7px; border:1px solid var(--borda); background:var(--cartao); color:var(--tinta); cursor:pointer; }
   button.principal { background:var(--serie); border-color:var(--serie); color:#fff; }
   button:disabled { opacity:.5; cursor:default; }
@@ -80,6 +80,15 @@ function centralHtml() {
   .produto .preco { font-size:17px; font-weight:600; font-variant-numeric:tabular-nums; }
   .produto button { margin-top:auto; }
   .produto a.botao { margin-top:auto; text-align:center; font-size:14px; padding:7px 14px; border-radius:7px; background:var(--serie); color:#fff; }
+  .selo.espera { background:var(--alertafundo); color:var(--alerta); }
+  .acoes { display:flex; gap:6px; flex-wrap:wrap; }
+  .acoes button { padding:4px 10px; font-size:13px; }
+  .pares { display:grid; gap:10px; margin-top:12px; }
+  .par { display:grid; grid-template-columns:1fr 1fr; gap:12px; border:1px solid var(--borda); border-radius:8px; padding:10px; }
+  @media (max-width:640px) { .par { grid-template-columns:1fr; } }
+  .lado { display:grid; grid-template-columns:64px 1fr; gap:10px; align-items:start; }
+  .lado img, .lado .semfoto { width:64px; height:64px; object-fit:contain; background:#fff; border-radius:6px; border:1px solid var(--borda); }
+  .lado-rotulo { font-size:12px; color:var(--suave); text-transform:uppercase; letter-spacing:.04em; }
   .produto a.botao:hover { text-decoration:none; filter:brightness(1.1); }
   .vazio { color:var(--suave); font-size:13px; margin:12px 0 0; }
   footer { max-width:1180px; margin:0 auto; padding:4px 16px 24px; color:var(--suave); font-size:12px; }
@@ -96,6 +105,7 @@ function centralHtml() {
   <nav role="tablist">
     <button id="aba-mineracao" role="tab" aria-selected="true">Mineração</button>
     <button id="aba-alta" role="tab" aria-selected="false">Em alta</button>
+    <button id="aba-accio" role="tab" aria-selected="false">Accio</button>
   </nav>
 </header>
 <main id="tela-alta" hidden>
@@ -108,6 +118,20 @@ function centralHtml() {
   <div id="alta-subindo" class="grade-alta"></div>
   <h2>Entraram entre os mais bem colocados</h2>
   <div id="alta-entraram" class="grade-alta"></div>
+</main>
+<main id="tela-accio" hidden>
+  <section class="cartao">
+    <h2>Pacotes no Accio Work</h2>
+    <p class="suave">Cada mineração gera um pacote com os produtos aptos. O sourcing é feito dentro do Accio: copie o pedido, cole na conversa com o agente Minerador Conecta Hub e o resultado aparece aqui quando o Accio terminar.</p>
+    <p id="accio-pasta" class="suave"></p>
+    <div class="rolagem"><table><thead><tr><th>Minerado em</th><th>Categoria</th><th class="num">Produtos</th><th>Sourcing</th><th>Ações</th></tr></thead><tbody id="accio-pacotes"></tbody></table></div>
+    <p id="accio-aviso" class="vazio"></p>
+  </section>
+  <section id="accio-detalhe" class="cartao" hidden>
+    <h2 id="accio-detalhe-titulo">Resultado</h2>
+    <p id="accio-detalhe-nota" class="suave"></p>
+    <div id="accio-pares" class="pares"></div>
+  </section>
 </main>
 <main id="tela-mineracao">
   <div id="aviso" class="aviso" hidden></div>
@@ -393,14 +417,122 @@ function centralHtml() {
   $('p7').addEventListener('click', function () { periodo(7); });
   $('p30').addEventListener('click', function () { periodo(30); });
 
-  function aba(nome) {
-    var alta = nome === 'alta';
-    $('tela-alta').hidden = !alta;
-    $('tela-mineracao').hidden = alta;
-    $('aba-alta').setAttribute('aria-selected', String(alta));
-    $('aba-mineracao').setAttribute('aria-selected', String(!alta));
-    if (alta) buscarAlta();
+  /* ---- Accio ---- */
+  function fotoDoAlibaba(u) {
+    return typeof u === 'string' && /^https:\\/\\/[a-z0-9.-]+\\.alicdn\\.com\\//i.test(u) ? u : null;
   }
+  function copiar(botao, texto) {
+    navigator.clipboard.writeText(texto).then(function () {
+      var antes = botao.textContent;
+      botao.textContent = 'Copiado';
+      setTimeout(function () { botao.textContent = antes; }, 1500);
+    });
+  }
+  function lado(rotulo, foto, nome, href, linhas) {
+    var l = el('div', null, 'lado');
+    if (foto) { var img = el('img'); img.src = foto; img.alt = ''; img.loading = 'lazy'; l.appendChild(img); }
+    else l.appendChild(el('div', 'sem foto', 'semfoto'));
+    var corpo = el('div');
+    corpo.appendChild(el('div', rotulo, 'lado-rotulo'));
+    var titulo = el('div', null, 'sug-nome');
+    titulo.appendChild(href ? link(nome, href) : el('span', nome));
+    corpo.appendChild(titulo);
+    linhas.filter(Boolean).forEach(function (t) { corpo.appendChild(el('p', t, 'suave')); });
+    l.appendChild(corpo);
+    return l;
+  }
+  function verPacote(p) {
+    fetch('/api/accio/pacote?id=' + encodeURIComponent(p.id), { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var caixa = $('accio-pares');
+        caixa.replaceChildren();
+        $('accio-detalhe').hidden = false;
+        $('accio-detalhe-titulo').textContent = 'Resultado · ' + p.categoria;
+        if (d.erro) { $('accio-detalhe-nota').textContent = d.erro; return; }
+        $('accio-detalhe-nota').textContent = 'Preço do Alibaba é o do anúncio, em dólares: não é cotação FOB. Lido de ' + d.arquivo;
+        d.linhas.forEach(function (x) {
+          var par = el('div', null, 'par');
+          par.appendChild(lado('Mercado Livre', fotoSegura(x.produto.foto), x.produto.nome, linkSeguro(x.produto.link),
+            [preco(x.produto.menor_preco), x.produto.id]));
+          var c = x.candidato;
+          if (c) {
+            par.appendChild(lado('Alibaba', fotoDoAlibaba(c.foto), c.titulo, linkSeguro(c.link), [
+              c.fornecedor,
+              [c.preco, c.moq ? 'MOQ ' + c.moq : '', c.local].filter(Boolean).join(' · '),
+              (c.aderencia ? 'Aderência ' + c.aderencia + ' · ' : '') + (x.cruzamento === 'codigo' ? 'cruzado pelo código' : 'cruzado por semelhança; conferir'),
+            ]));
+          } else {
+            par.appendChild(lado('Alibaba', null, 'Sem candidato', null, []));
+          }
+          caixa.appendChild(par);
+        });
+        $('accio-detalhe').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+  }
+  function gerarPlanilha(botao, p) {
+    botao.disabled = true;
+    botao.textContent = 'Gerando';
+    fetch('/api/accio/planilha?id=' + encodeURIComponent(p.id), { method: 'POST', headers: { 'X-Conecta-Hub': '1' } })
+      .then(function (r) { return r.json(); })
+      .then(function (r) { $('accio-aviso').textContent = r.erro ? r.erro : 'Planilha gravada em ' + r.arquivo; })
+      .catch(function () { $('accio-aviso').textContent = 'Não consegui gerar a planilha.'; })
+      .then(function () { botao.disabled = false; botao.textContent = 'Gerar planilha'; });
+  }
+  function desenharAccio(a) {
+    $('accio-pasta').textContent = 'Pasta dos pacotes: ' + a.pasta;
+    var corpo = $('accio-pacotes');
+    corpo.replaceChildren();
+    if (!a.pacotes.length) {
+      var vazio = el('tr'); var td = el('td', 'Nenhum pacote gravado ainda.', 'vazio'); td.colSpan = 5; vazio.appendChild(td); corpo.appendChild(vazio);
+    }
+    a.pacotes.forEach(function (p) {
+      var tr = el('tr');
+      tr.appendChild(el('td', hora(p.minerado_em)));
+      tr.appendChild(el('td', p.categoria));
+      tr.appendChild(el('td', p.produtos, 'num'));
+      var s = el('td');
+      if (p.sourcing) {
+        s.appendChild(el('span', 'Feito · ' + p.sourcing.candidatos + ' candidatos', 'selo'));
+        if (p.sourcing.ligado_por === 'semelhanca') s.appendChild(el('p', 'ligado ao pacote por semelhança', 'suave'));
+      } else {
+        s.appendChild(el('span', 'Aguardando', 'selo espera'));
+      }
+      tr.appendChild(s);
+      var acoes = el('td');
+      var grupo = el('div', null, 'acoes');
+      var pedir = el('button', 'Copiar pedido');
+      pedir.addEventListener('click', function () { copiar(pedir, p.pedido); });
+      grupo.appendChild(pedir);
+      if (p.sourcing) {
+        var ver = el('button', 'Ver resultado');
+        ver.addEventListener('click', function () { verPacote(p); });
+        grupo.appendChild(ver);
+        var planilha = el('button', 'Gerar planilha');
+        planilha.addEventListener('click', function () { gerarPlanilha(planilha, p); });
+        grupo.appendChild(planilha);
+      }
+      acoes.appendChild(grupo);
+      tr.appendChild(acoes);
+      corpo.appendChild(tr);
+    });
+  }
+  function buscarAccio() {
+    fetch('/api/accio', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(desenharAccio)
+      .catch(function () { $('accio-aviso').textContent = 'Não consegui ler a pasta do Accio. O minerador está ligado?'; });
+  }
+
+  function aba(nome) {
+    ['mineracao', 'alta', 'accio'].forEach(function (n) {
+      $('tela-' + n).hidden = n !== nome;
+      $('aba-' + n).setAttribute('aria-selected', String(n === nome));
+    });
+    if (nome === 'alta') buscarAlta();
+    if (nome === 'accio') buscarAccio();
+  }
+  $('aba-accio').addEventListener('click', function () { aba('accio'); });
   $('aba-mineracao').addEventListener('click', function () { aba('mineracao'); });
   $('aba-alta').addEventListener('click', function () { aba('alta'); });
 

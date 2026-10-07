@@ -517,3 +517,9 @@ test('em alta compara com a mineracao do periodo e so traz produtos aptos', () =
   assert.equal(meus(mes.subindo)[0].comparado_com, '2026-05-01T10:00:00.000Z');
   assert.ok(mes.menor_periodo_em_dias < 30);
 });
+
+test('o script da central e JavaScript valido', () => {
+  const html = require('../server/central').centralHtml();
+  const js = html.slice(html.indexOf('<script>') + 8, html.indexOf('</script>'));
+  assert.doesNotThrow(() => new Function(js));
+});

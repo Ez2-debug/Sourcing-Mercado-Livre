@@ -236,6 +236,12 @@ A aba **Em alta** lista os produtos aptos que subiram no ranking, ou que entrara
 
 Cada produto tem um botão de cotação. Sem `CONECTA_HUB_COTACAO_URL`, o botão copia o texto do pedido.
 
+### Accio
+
+A aba **Accio** lista os pacotes gravados na pasta do Accio Work e mostra quais já têm resultado de sourcing. **Copiar pedido** copia o texto para colar na conversa do Accio; **Ver resultado** mostra cada produto do Mercado Livre ao lado do candidato do Alibaba; **Gerar planilha** grava a planilha do sourcing.
+
+O Accio não informa a qual pacote um resultado pertence. A central liga o `sourcing.md` ao pacote cujos produtos ele cita pelo código; sem código, ao pacote com que a maior parte dos candidatos casa por semelhança, e avisa na tela. O sourcing em si continua sendo disparado dentro do Accio.
+
 Para o minerador abrir sozinho quando o Windows inicia a sessão:
 
 ```bash

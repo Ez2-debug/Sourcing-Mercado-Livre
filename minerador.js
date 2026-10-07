@@ -25,12 +25,15 @@ const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 
-const { cleanEnv, credentialsConfigured, log } = require('./server/meli');
+const { ToolError, cleanEnv, credentialsConfigured, log } = require('./server/meli');
 const { filaOrdenada, minerarProximaDaFila } = require('./server/automacao');
 const { calcularIndicadores } = require('./server/indicadores');
 const { dataLocal, mineracaoAnterior, mineracoesDoDia, pastaMineracoes } = require('./server/saida');
 const { centralHtml } = require('./server/central');
 const { PERIODOS, emAlta } = require('./server/emalta');
+const { detalharPacote, listarPacotes } = require('./server/accio');
+const { planilhaDoSourcing } = require('./server/sourcing');
+const { carregarMineracao } = require('./server/saida');
 
 const MAX_HISTORICO = 100;
 const SEM_CREDENCIAL = 'Client Secret do Mercado Livre nao configurado. Defina a variavel de ambiente MELI_CLIENT_SECRET e reinicie o minerador.';
@@ -224,6 +227,30 @@ function hostLocal(req) {
   return host === `127.0.0.1:${PORTA}` || host === `localhost:${PORTA}`;
 }
 
+function json(res, status, corpo) {
+  responder(res, status, 'application/json; charset=utf-8', JSON.stringify(corpo));
+}
+
+// Erro de uso (pacote inexistente, sourcing ainda nao feito) vira mensagem
+// para a tela; qualquer outro sobe.
+function comMensagem(res, fn) {
+  return Promise.resolve().then(fn).then(
+    (corpo) => json(res, 200, corpo),
+    (err) => {
+      if (err instanceof ToolError) return json(res, 400, { erro: err.message });
+      log(`erro na central: ${err.message}`);
+      return json(res, 500, { erro: 'Erro interno.' });
+    },
+  );
+}
+
+// Monta a planilha do sourcing de um pacote a partir do resultado ja ligado a ele.
+async function planilhaDoPacote(id) {
+  const d = detalharPacote(id);
+  const r = await planilhaDoSourcing(carregarMineracao(id), d.pasta_do_resultado);
+  return { arquivo: r.arquivo, produtos: r.produtos, candidatos: r.candidatos };
+}
+
 const COMANDOS = {
   pausar() {
     estado.pausado = true;
@@ -246,6 +273,9 @@ function atender(req, res) {
   const pedido = new URL(req.url, `http://127.0.0.1:${PORTA}`);
   const caminho = pedido.pathname;
 
+  if (req.method === 'POST' && caminho === '/api/accio/planilha' && req.headers['x-conecta-hub'] === '1') {
+    return comMensagem(res, () => planilhaDoPacote(pedido.searchParams.get('id')));
+  }
   if (req.method === 'POST') {
     const comando = caminho.startsWith('/api/') ? COMANDOS[caminho.slice(5)] : null;
     // O cabecalho proprio impede que um formulario de outro site dispare o comando.
@@ -257,6 +287,8 @@ function atender(req, res) {
 
   if (caminho === '/') return responder(res, 200, 'text/html; charset=utf-8', centralHtml());
   if (caminho === '/api/estado') return responder(res, 200, 'application/json; charset=utf-8', JSON.stringify(retrato()));
+  if (caminho === '/api/accio') return json(res, 200, listarPacotes());
+  if (caminho === '/api/accio/pacote') return comMensagem(res, () => detalharPacote(pedido.searchParams.get('id')));
   if (caminho === '/api/em-alta') {
     const dias = Number.parseInt(pedido.searchParams.get('dias'), 10);
     return responder(res, 200, 'application/json; charset=utf-8', JSON.stringify(emAltaGuardado(PERIODOS.includes(dias) ? dias : PERIODOS[0])));
