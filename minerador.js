@@ -14,6 +14,8 @@
  *   CONECTA_HUB_INTERVALO_MIN  minutos entre mineracoes (padrao 60, minimo 5)
  *   CONECTA_HUB_PORTA          porta da central (padrao 4310)
  *   SUPABASE_URL, SUPABASE_KEY opcionais, para gravar tambem no Supabase
+ *   CONECTA_HUB_COTACAO_URL    opcional, endereco https do botao de cotacao;
+ *                              {pedido} vira o texto do pedido (ex.: link do WhatsApp)
  *
  * A central so atende em 127.0.0.1: nao fica visivel na rede.
  */
@@ -28,6 +30,7 @@ const { filaOrdenada, minerarProximaDaFila } = require('./server/automacao');
 const { calcularIndicadores } = require('./server/indicadores');
 const { dataLocal, mineracaoAnterior, mineracoesDoDia, pastaMineracoes } = require('./server/saida');
 const { centralHtml } = require('./server/central');
+const { PERIODOS, emAlta } = require('./server/emalta');
 
 const MAX_HISTORICO = 100;
 const SEM_CREDENCIAL = 'Client Secret do Mercado Livre nao configurado. Defina a variavel de ambiente MELI_CLIENT_SECRET e reinicie o minerador.';
@@ -39,6 +42,12 @@ function inteiro(valor, padrao, min, max) {
 
 const INTERVALO_MIN = inteiro(process.env.CONECTA_HUB_INTERVALO_MIN, 60, 5, 1440);
 const PORTA = inteiro(process.env.CONECTA_HUB_PORTA, 4310, 1024, 65535);
+
+// So https: o endereco vai para um link na pagina.
+function enderecoDeCotacao() {
+  const u = cleanEnv(process.env.CONECTA_HUB_COTACAO_URL);
+  return /^https:\/\/[^\s"'<>]+$/i.test(u) ? u : null;
+}
 
 function arquivoDeEstado() {
   const base = cleanEnv(process.env.CONECTA_HUB_SAIDA);
@@ -68,6 +77,13 @@ const estado = {
 };
 let relogio = null;
 let resumoDeHoje = null;
+// Comparar o historico le dezenas de arquivos: guarda por periodo ate a proxima mineracao.
+const altaGuardada = new Map();
+
+function emAltaGuardado(dias) {
+  if (!altaGuardada.has(dias)) altaGuardada.set(dias, { ...emAlta({ dias }), cotacao_url: enderecoDeCotacao() });
+  return altaGuardada.get(dias);
+}
 
 function gravarEstado() {
   try {
@@ -165,6 +181,7 @@ async function ciclo() {
     });
     estado.problema = null;
     resumoDeHoje = null;
+    altaGuardada.clear();
     hoje().planilha = r.planilha && r.planilha.arquivo ? r.planilha.arquivo : null;
     registrar({
       mineracao_id: r.m.id,
@@ -226,7 +243,8 @@ const COMANDOS = {
 
 function atender(req, res) {
   if (!hostLocal(req)) return responder(res, 403, 'text/plain; charset=utf-8', 'Acesso apenas local.');
-  const caminho = new URL(req.url, `http://127.0.0.1:${PORTA}`).pathname;
+  const pedido = new URL(req.url, `http://127.0.0.1:${PORTA}`);
+  const caminho = pedido.pathname;
 
   if (req.method === 'POST') {
     const comando = caminho.startsWith('/api/') ? COMANDOS[caminho.slice(5)] : null;
@@ -239,6 +257,10 @@ function atender(req, res) {
 
   if (caminho === '/') return responder(res, 200, 'text/html; charset=utf-8', centralHtml());
   if (caminho === '/api/estado') return responder(res, 200, 'application/json; charset=utf-8', JSON.stringify(retrato()));
+  if (caminho === '/api/em-alta') {
+    const dias = Number.parseInt(pedido.searchParams.get('dias'), 10);
+    return responder(res, 200, 'application/json; charset=utf-8', JSON.stringify(emAltaGuardado(PERIODOS.includes(dias) ? dias : PERIODOS[0])));
+  }
 
   // Painel e catalogo de uma mineracao. O id vira nome de pasta: so o formato
   // gerado por salvarMineracao e so esses dois arquivos.

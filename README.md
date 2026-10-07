@@ -228,6 +228,13 @@ A central fica em `http://127.0.0.1:4310` e mostra, ao vivo, a categoria em mine
 | `CONECTA_HUB_INTERVALO_MIN` | Minutos entre minerações. Padrão 60, mínimo 5. |
 | `CONECTA_HUB_PORTA` | Porta da central. Padrão 4310. |
 | `SUPABASE_URL`, `SUPABASE_KEY` | Opcionais, para gravar também no Supabase. |
+| `CONECTA_HUB_COTACAO_URL` | Opcional. Endereço `https` do botão de cotação; `{pedido}` vira o texto do pedido. Exemplo: `https://wa.me/55DDDNUMERO?text={pedido}`. |
+
+### Em alta
+
+A aba **Em alta** lista os produtos aptos que subiram no ranking, ou que entraram entre os mais bem colocados, comparando a mineração mais recente de cada categoria com a de 7 ou 30 dias antes. Quando o histórico é mais curto que o período, a comparação usa a mineração mais antiga e a tela informa a data em cada produto. É mudança de posição, não de vendas.
+
+Cada produto tem um botão de cotação. Sem `CONECTA_HUB_COTACAO_URL`, o botão copia o texto do pedido.
 
 Para o minerador abrir sozinho quando o Windows inicia a sessão:
 

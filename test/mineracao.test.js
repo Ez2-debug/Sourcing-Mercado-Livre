@@ -481,3 +481,39 @@ test('monta a consulta do JoomPulse e le a resposta em colunas', async () => {
   assert.equal(por('MLB100').tendencia, 'anúncio novo com tração (83 dias)');
   assert.equal(por('MLB200').tendencia, undefined, 'anuncio antigo fica sem tendencia');
 });
+
+test('em alta compara com a mineracao do periodo e so traz produtos aptos', () => {
+  const { emAlta } = require('../server/emalta');
+  const produto = (id, posicao, extra) => ({
+    id, nome: `Produto ${id}`, categoria: 'Teste', melhor_posicao: posicao,
+    sinais: { sem_marca: true, marca_conhecida: false, regulatorio: [] }, ...extra,
+  });
+  const gravar = (dia, produtos) => {
+    const id = `202605${dia}-100000-MLB777`;
+    const pasta = path.join(process.env.CONECTA_HUB_SAIDA, id);
+    fs.mkdirSync(pasta, { recursive: true });
+    fs.writeFileSync(path.join(pasta, 'mineracao.json'), JSON.stringify({
+      id, consultado_em: `2026-05-${dia}T10:00:00.000Z`, categoria_raiz: { id: 'MLB777' }, categorias: [{ produtos }],
+    }));
+  };
+  gravar('01', [produto('MLB901', 9), produto('MLB902', 1)]);
+  gravar('10', [produto('MLB901', 6), produto('MLB902', 2)]);
+  gravar('12', [
+    produto('MLB901', 2),
+    produto('MLB902', 3),
+    produto('MLB903', 4),
+    produto('MLB904', 1, { sinais: { sem_marca: false, marca_conhecida: true, regulatorio: [] } }),
+  ]);
+
+  const meus = (lista) => lista.filter((p) => /^MLB90\d$/.test(p.id));
+  const semana = emAlta({ dias: 7, limite: 100 });
+  // 12/05 menos 7 dias cai em 05/05: a base e a mineracao de 01/05, nao a de 10/05.
+  assert.deepEqual(meus(semana.subindo).map((p) => [p.id, p.posicao_anterior, p.posicao, p.subiu]), [['MLB901', 9, 2, 7]]);
+  assert.deepEqual(meus(semana.entraram).map((p) => p.id), ['MLB903'], 'marca conhecida fica de fora');
+  assert.equal(meus(semana.subindo)[0].dias_comparados, 11);
+
+  // Sem 30 dias de historico, usa a mineracao mais antiga e informa o periodo real.
+  const mes = emAlta({ dias: 30, limite: 100 });
+  assert.equal(meus(mes.subindo)[0].comparado_com, '2026-05-01T10:00:00.000Z');
+  assert.ok(mes.menor_periodo_em_dias < 30);
+});

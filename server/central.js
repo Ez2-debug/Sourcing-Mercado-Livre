@@ -63,6 +63,24 @@ function centralHtml() {
   th { color:var(--tinta2); font-weight:600; white-space:nowrap; } .num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
   tr.atual td { background:var(--trilho); }
   .falha { color:var(--erro); }
+  nav { max-width:1180px; margin:0 auto; padding:0 16px; display:flex; gap:4px; }
+  nav button { border:0; border-bottom:2px solid transparent; border-radius:0; background:none; padding:9px 12px; color:var(--tinta2); font-weight:600; }
+  nav button[aria-selected="true"] { color:var(--tinta); border-bottom-color:var(--serie); }
+  .barra-alta { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  .barra-alta h2 { margin-right:auto; }
+  .periodos { display:inline-flex; border:1px solid var(--borda); border-radius:7px; overflow:hidden; }
+  .periodos button { border:0; border-radius:0; background:var(--cartao); }
+  .periodos button[aria-pressed="true"] { background:var(--serie); color:#fff; }
+  .grade-alta { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap:12px; margin:12px 0 20px; }
+  .produto { background:var(--cartao); border:1px solid var(--borda); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px; }
+  .produto img, .produto .semfoto { width:100%; height:150px; object-fit:contain; background:#fff; border-radius:6px; border:1px solid var(--borda); }
+  .produto-nome { font-weight:600; font-size:14px; overflow-wrap:anywhere; }
+  .selo { align-self:flex-start; padding:3px 9px; border-radius:999px; font-size:12px; font-weight:650; background:var(--okfundo); color:var(--ok); font-variant-numeric:tabular-nums; }
+  .selo.novo { background:var(--trilho); color:var(--link); }
+  .produto .preco { font-size:17px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .produto button { margin-top:auto; }
+  .produto a.botao { margin-top:auto; text-align:center; font-size:14px; padding:7px 14px; border-radius:7px; background:var(--serie); color:#fff; }
+  .produto a.botao:hover { text-decoration:none; filter:brightness(1.1); }
   .vazio { color:var(--suave); font-size:13px; margin:12px 0 0; }
   footer { max-width:1180px; margin:0 auto; padding:4px 16px 24px; color:var(--suave); font-size:12px; }
 </style>
@@ -75,8 +93,23 @@ function centralHtml() {
     <button id="pausar">Pausar</button>
     <button id="agora" class="principal">Minerar agora</button>
   </div>
+  <nav role="tablist">
+    <button id="aba-mineracao" role="tab" aria-selected="true">Mineração</button>
+    <button id="aba-alta" role="tab" aria-selected="false">Em alta</button>
+  </nav>
 </header>
-<main>
+<main id="tela-alta" hidden>
+  <div class="barra-alta">
+    <h2>Produtos em alta</h2>
+    <span class="periodos"><button id="p7" aria-pressed="true">7 dias</button><button id="p30" aria-pressed="false">30 dias</button></span>
+  </div>
+  <p id="alta-resumo" class="suave">&nbsp;</p>
+  <h2 id="alta-subindo-titulo" style="margin-top:16px">Subindo no ranking</h2>
+  <div id="alta-subindo" class="grade-alta"></div>
+  <h2>Entraram entre os mais bem colocados</h2>
+  <div id="alta-entraram" class="grade-alta"></div>
+</main>
+<main id="tela-mineracao">
   <div id="aviso" class="aviso" hidden></div>
   <section id="cartao-agora" class="cartao agora">
     <div>
@@ -283,6 +316,93 @@ function centralHtml() {
   }
   $('pausar').addEventListener('click', function () { comando(estado && estado.pausado ? 'retomar' : 'pausar'); });
   $('agora').addEventListener('click', function () { comando('minerar-agora'); });
+
+  /* ---- Em alta ---- */
+  var dias = 7;
+
+  function dia(iso) {
+    return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  }
+  function textoDoPedido(p) {
+    return 'Quero cotar a importação deste produto: ' + p.nome + ' (' + p.id + ')' + (p.link ? ' ' + p.link : '');
+  }
+  function cartaoDeProduto(p, cotacao) {
+    var c = el('article', null, 'produto');
+    var foto = fotoSegura(p.foto);
+    if (foto) { var img = el('img'); img.src = foto; img.alt = ''; img.loading = 'lazy'; c.appendChild(img); }
+    else c.appendChild(el('div', 'sem foto', 'semfoto'));
+    c.appendChild(p.subiu
+      ? el('span', '▲ ' + p.subiu + ' · ' + p.posicao_anterior + 'º → ' + p.posicao + 'º', 'selo')
+      : el('span', 'Entrou em ' + p.posicao + 'º', 'selo novo'));
+    var nome = el('div', null, 'produto-nome');
+    var href = linkSeguro(p.link);
+    nome.appendChild(href ? link(p.nome, href) : el('span', p.nome));
+    c.appendChild(nome);
+    if (typeof p.menor_preco === 'number') c.appendChild(el('div', preco(p.menor_preco), 'preco'));
+    var partes = [p.categoria, p.ncm ? 'NCM sugerida ' + p.ncm : '', 'comparado com ' + dia(p.comparado_com)];
+    c.appendChild(el('p', partes.filter(Boolean).join(' · '), 'suave'));
+    if (cotacao) {
+      var a = link('Cotar importação', cotacao.replace('{pedido}', encodeURIComponent(textoDoPedido(p))));
+      a.className = 'botao';
+      c.appendChild(a);
+    } else {
+      var b = el('button', 'Copiar pedido de cotação');
+      b.addEventListener('click', function () {
+        navigator.clipboard.writeText(textoDoPedido(p)).then(function () {
+          b.textContent = 'Copiado';
+          setTimeout(function () { b.textContent = 'Copiar pedido de cotação'; }, 1500);
+        });
+      });
+      c.appendChild(b);
+    }
+    return c;
+  }
+  function desenharAlta(a) {
+    var cotacao = linkSeguro(a.cotacao_url);
+    var resumo;
+    if (!a.categorias_comparadas) {
+      resumo = 'Ainda não há duas minerações da mesma categoria para comparar. O histórico começa a aparecer no segundo ciclo da fila.';
+    } else {
+      resumo = a.categorias_comparadas + ' categorias comparadas · ' + a.total_subindo + ' produtos aptos subiram · ' + a.total_entraram + ' entraram.';
+      if (a.menor_periodo_em_dias !== null && a.menor_periodo_em_dias < a.dias_pedidos) {
+        resumo += ' O histórico ainda é mais curto que ' + a.dias_pedidos + ' dias: há categoria comparada com ' +
+          a.menor_periodo_em_dias.toLocaleString('pt-BR') + ' dia(s) atrás. A data de comparação aparece em cada produto.';
+      }
+      if (a.categorias_sem_historico) resumo += ' ' + a.categorias_sem_historico + ' categorias ainda têm uma mineração só.';
+    }
+    $('alta-resumo').textContent = resumo;
+    [['alta-subindo', a.subindo, 'Nenhum produto apto subiu no período.'], ['alta-entraram', a.entraram, 'Nenhum produto apto entrou no período.']].forEach(function (g) {
+      var caixa = $(g[0]);
+      caixa.replaceChildren();
+      if (!g[1].length) caixa.appendChild(el('p', g[2], 'vazio'));
+      g[1].forEach(function (p) { caixa.appendChild(cartaoDeProduto(p, cotacao)); });
+    });
+  }
+  function buscarAlta() {
+    fetch('/api/em-alta?dias=' + dias, { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(desenharAlta)
+      .catch(function () { $('alta-resumo').textContent = 'Não consegui ler o histórico. O minerador está ligado?'; });
+  }
+  function periodo(n) {
+    dias = n;
+    $('p7').setAttribute('aria-pressed', String(n === 7));
+    $('p30').setAttribute('aria-pressed', String(n === 30));
+    buscarAlta();
+  }
+  $('p7').addEventListener('click', function () { periodo(7); });
+  $('p30').addEventListener('click', function () { periodo(30); });
+
+  function aba(nome) {
+    var alta = nome === 'alta';
+    $('tela-alta').hidden = !alta;
+    $('tela-mineracao').hidden = alta;
+    $('aba-alta').setAttribute('aria-selected', String(alta));
+    $('aba-mineracao').setAttribute('aria-selected', String(!alta));
+    if (alta) buscarAlta();
+  }
+  $('aba-mineracao').addEventListener('click', function () { aba('mineracao'); });
+  $('aba-alta').addEventListener('click', function () { aba('alta'); });
 
   buscar();
   setInterval(buscar, 5000);
