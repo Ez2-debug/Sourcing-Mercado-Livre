@@ -1,0 +1,28 @@
+{
+  "name": "conecta-hub-sourcing",
+  "displayName": "Conecta Hub Sourcing (Mercado Livre)",
+  "version": "0.1.0",
+  "description": "Minera produtos do Mercado Livre Brasil por categoria pela API oficial: categorias, mais vendidos, tendencias, triagem de marca e regulatorio, sugestao de NCM, painel de indicadores e planilha Excel. O Client Secret e lido da variavel de ambiente MELI_CLIENT_SECRET do usuario.",
+  "author": {
+    "name": "Erick Cavalcante"
+  },
+  "category": "e-commerce-marketplaces",
+  "tags": [
+    "mercado-livre",
+    "sourcing",
+    "product-research",
+    "importacao"
+  ],
+  "connectors": {
+    "mcpServers": {
+      "conecta-hub-sourcing": {
+        "type": "stdio",
+        "command": "node",
+        "args": [
+          "C:\\Users\\dmaul\\OneDrive\\Documentos\\conecta-hub-sourcing\\server\\index.js"
+        ],
+        "blocking": false
+      }
+    }
+  }
+}

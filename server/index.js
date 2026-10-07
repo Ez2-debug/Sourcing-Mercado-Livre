@@ -29,12 +29,13 @@ const { exportarExcel } = require('./planilha');
 const { definirFila, lerFila, ordenarFila } = require('./fila');
 const { planilhaDoSourcing } = require('./sourcing');
 const { calcularIndicadores, situacao } = require('./indicadores');
+const { executarMineracao, minerarProximaDaFila, tolerante } = require('./automacao');
 const {
   carregarMineracao, dataLocal, enviarParaAccio, gerarPainel, listarMineracoes, mineracoesDoDia, regravarMineracao,
   resumirMineracoes, salvarMineracao,
 } = require('./saida');
 
-const SERVER_VERSION = '0.14.0';
+const SERVER_VERSION = '0.15.0';
 const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
 /* ------------------------------------------------------------------ */
@@ -89,14 +90,6 @@ function filtrosAccio(args) {
   return { limite: args.limite, incluir_marcas: args.incluir_marcas, incluir_regulados: args.incluir_regulados };
 }
 
-// Minera, sugere NCM, grava em disco e, se configurado, no Supabase.
-async function executarMineracao(id, opcoes) {
-  const m = await minerarCategoria(id, opcoes);
-  m.ncm = await anotarNcm(todosOsProdutos(m));
-  const arquivos = salvarMineracao(m);
-  return { m, arquivos, supabase: await salvarSeConfigurado(m) };
-}
-
 // Mineracoes gravadas antes da versao 0.12 nao tem a data de catalogo. Busca
 // o que falta e regrava, para a planilha sair completa.
 async function comDatasDeCatalogo(mineracoes) {
@@ -115,15 +108,6 @@ function resolverData(valor) {
   return data;
 }
 
-// Roda um passo opcional e devolve o erro no resultado em vez de derrubar a ferramenta.
-async function tolerante(fn) {
-  try {
-    return await fn();
-  } catch (err) {
-    if (!(err instanceof ToolError)) throw err;
-    return { erro: err.message };
-  }
-}
 
 const TOOLS = [
   {
@@ -673,12 +657,8 @@ const TOOLS = [
       additionalProperties: false,
     },
     async run(args) {
-      const fila = lerFila();
-      if (!fila.categorias.length) throw new ToolError('A fila esta vazia. Use definir_fila para escolher as categorias da mineracao automatica.');
-      const ordem = ordenarFila(fila, listarMineracoes());
-      const alvo = ordem[0];
-      const { m, arquivos, supabase } = await executarMineracao(alvo.id, { profundidade: args.profundidade, max_produtos: args.max_produtos });
-      const hoje = dataLocal(m.consultado_em);
+      const { alvo, ordem, m, arquivos, supabase, planilha, accio } =
+        await minerarProximaDaFila({ profundidade: args.profundidade, max_produtos: args.max_produtos });
       const out = {
         mineracao_id: m.id,
         categoria: alvo.caminho,
@@ -697,12 +677,12 @@ const TOOLS = [
           : null,
         painel_html: arquivos.painel,
         supabase,
-        planilha_do_dia: await tolerante(() => exportarExcel(mineracoesDoDia(hoje), hoje)),
+        planilha_do_dia: planilha,
         proxima_da_fila: (ordem[1] || alvo).caminho,
         categorias_na_fila: ordem.length,
         aviso: AVISO_MINERACAO,
       };
-      if (fila.enviar_para_accio) out.accio = await tolerante(() => enviarParaAccio(m, {}));
+      if (accio) out.accio = accio;
       return out;
     },
   },

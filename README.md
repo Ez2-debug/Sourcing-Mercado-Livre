@@ -211,3 +211,30 @@ A extensão instalada no Claude Desktop é uma cópia. Para ela usar o código d
 ```bash
 npx @anthropic-ai/mcpb pack
 ```
+
+## Minerador autônomo e central
+
+O minerador roda sem o Claude e não consome tokens: a cada intervalo ele minera a próxima categoria da fila (a mesma de `definir_fila`) e grava o mesmo resultado que `minerar_proxima` — pastas da mineração, planilha do dia, pacote do Accio Work e, se configurado, Supabase.
+
+```bash
+npm run minerar
+```
+
+A central fica em `http://127.0.0.1:4310` e mostra, ao vivo, a categoria em mineração, a contagem para a próxima, os totais do dia, as sugestões, as últimas execuções e a fila. Os botões **Pausar** e **Minerar agora** controlam o ciclo.
+
+| Variável | Para quê |
+|---|---|
+| `MELI_CLIENT_SECRET` | Obrigatória. A mesma chave da extensão. |
+| `CONECTA_HUB_INTERVALO_MIN` | Minutos entre minerações. Padrão 60, mínimo 5. |
+| `CONECTA_HUB_PORTA` | Porta da central. Padrão 4310. |
+| `SUPABASE_URL`, `SUPABASE_KEY` | Opcionais, para gravar também no Supabase. |
+
+Para o minerador abrir sozinho quando o Windows inicia a sessão:
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts\inicio-automatico.ps1
+```
+
+Com `-Remover` no fim, o início automático é desligado.
+
+Não rode o minerador junto com uma tarefa agendada do Claude que chame `minerar_proxima`: os dois minerariam a mesma fila.
