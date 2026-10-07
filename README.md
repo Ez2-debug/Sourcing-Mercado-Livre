@@ -212,6 +212,27 @@ A extensão instalada no Claude Desktop é uma cópia. Para ela usar o código d
 npx @anthropic-ai/mcpb pack
 ```
 
+## Aplicativo web
+
+A pasta `web/` é a versão do produto com cara de serviço: login, **Em alta** e **Visão geral**, lendo as minerações do Supabase.
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Sem configuração, abre em **modo demonstração** em `http://127.0.0.1:5173` e lê a central do minerador local, que precisa estar ligada.
+
+Para ler o Supabase e exigir login:
+
+1. Rode `supabase/politicas-web.sql` no SQL Editor do projeto. Libera só leitura, e só para usuário logado.
+2. Em Authentication, desligue o cadastro público e crie o usuário pelo painel.
+3. Copie `web/.env.example` para `web/.env.local` e preencha o endereço do projeto e a chave **pública** (anon/publishable). A chave secreta nunca entra aqui.
+4. Para o banco receber as minerações do minerador autônomo, defina `SUPABASE_URL` e `SUPABASE_KEY` (a secreta) como variáveis de ambiente do Windows.
+
+`npm run build` gera o site estático em `web/dist`, pronto para qualquer hospedagem de arquivos.
+
 ## Minerador autônomo e central
 
 O minerador roda sem o Claude e não consome tokens: a cada intervalo ele minera a próxima categoria da fila (a mesma de `definir_fila`) e grava o mesmo resultado que `minerar_proxima` — pastas da mineração, planilha do dia, pacote do Accio Work e, se configurado, Supabase.
