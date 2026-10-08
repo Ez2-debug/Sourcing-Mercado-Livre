@@ -10,7 +10,7 @@ const linkSeguro = (u) => (typeof u === 'string' && /^https:\/\//i.test(u) ? u :
 export async function baixarPlanilha(razao) {
   const { default: ExcelJS } = await import('exceljs');
   const livro = new ExcelJS.Workbook();
-  livro.creator = 'Conecta Hub Sourcing';
+  livro.creator = 'Conecta Market Sourcing';
   livro.created = new Date();
 
   for (const aba of razao.abas) {

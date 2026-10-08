@@ -1,4 +1,6 @@
-# Conecta Hub Sourcing
+# Conecta Market Sourcing
+
+O nome de exibição do produto é **Conecta Market Sourcing**. O identificador da extensão, o nome das ferramentas MCP (`mcp__Conecta_Hub_Sourcing__*`), a pasta de dados (`~/ConectaHubSourcing`) e a tarefa do Windows mantêm o nome antigo de propósito: trocá-los quebraria as permissões e as tarefas agendadas.
 
 Extensão local do Claude Desktop (formato MCPB) que expõe a API oficial do Mercado Livre Brasil como servidor MCP, minera produtos por categoria e entrega o resultado ao Accio Work. Uso: sourcing e importação da Conecta Hub. O [README.md](README.md) descreve as ferramentas e o formato das saídas.
 
@@ -30,6 +32,8 @@ A extensão instalada continua sendo a que o Claude Desktop executa; alteraçõe
 - `server/cotacao.js` — cotacao em duas planilhas com os mesmos produtos na mesma ordem: uma com os dados do Mercado Livre, outra com os candidatos do Alibaba.
 - `server/shopee.js` — produtos da Shopee Brasil a partir da resposta do JoomPulse (`query_cubejs_shopee`), gravados em disco.
 - `server/joompro.js` — catalogo de importacao da China (JoomPro) a partir do JoomPulse (`query_cubejs_joompro`), com o par no Mercado Livre.
+- `server/cambio.js` — dolar PTAX do Banco Central (API publica), com cache; so para converter preco de anuncio.
+- `server/suportify.js` — textos e base de conhecimento (.md de perguntas e respostas) para o agente de atendimento no Suportify.
 - `server/pedidos.js` — fila de pedidos para o Claude (cotacao no Accio, atualizacao da Shopee, estimativas, texto livre).
 - `scripts/claude.js` — atalhos de linha de comando para o Claude atender a fila, gravar a Shopee e gerar as planilhas da cotacao.
 - `server/central.js` — pagina da central (dados escritos no DOM com `textContent`).

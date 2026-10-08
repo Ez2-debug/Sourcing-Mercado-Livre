@@ -2,7 +2,7 @@
 'use strict';
 
 /*
- * Minerador autonomo da Conecta Hub Sourcing.
+ * Minerador autonomo e backend da Conecta Market Sourcing.
  *
  * Roda sozinho, sem o Claude: a cada intervalo minera a proxima categoria da
  * fila (a mesma de definir_fila) e mostra o andamento em uma pagina local.
@@ -35,6 +35,8 @@ const { detalharPacote, listarPacotes } = require('./server/accio');
 const { planilhasDaCotacao } = require('./server/cotacao');
 const { lerShopee } = require('./server/shopee');
 const { lerJoompro } = require('./server/joompro');
+const { atualizarCambio, cambioGuardado } = require('./server/cambio');
+const { gravarBase } = require('./server/suportify');
 const { sincronizarRetratos } = require('./server/supabase');
 const { TIPOS, criarPedido, lerPedidos } = require('./server/pedidos');
 const { todosOsProdutos } = require('./server/mineracao');
@@ -126,7 +128,7 @@ function hoje() {
     produtos,
     aptos,
     sugestoes: sugestoes.slice(0, 8).map((s) => ({
-      nome: s.nome, categoria: s.categoria, foto: s.foto, link: s.link, menor_preco: s.menor_preco, prioridade: s.prioridade, ncm: s.ncm,
+      id: s.id, nome: s.nome, categoria: s.categoria, foto: s.foto, link: s.link, menor_preco: s.menor_preco, prioridade: s.prioridade, ncm: s.ncm,
     })),
     planilha: resumoDeHoje && resumoDeHoje.data === data ? resumoDeHoje.planilha : null,
   };
@@ -202,6 +204,7 @@ async function ciclo() {
       aptos: r.arquivos.indicadores.triagem.apto,
     });
     log(`concluida ${r.m.id}: ${r.arquivos.indicadores.totais.produtos} produtos`);
+    await atualizarCambio();
     // Leva a Shopee e as cotacoes para o aplicativo hospedado, se o Supabase estiver configurado.
     const retratos = await sincronizarRetratos();
     if (retratos && retratos.erro) log(`retratos nao enviados: ${retratos.erro}`);
@@ -348,6 +351,17 @@ function integracoes() {
   ];
 }
 
+// Base de conhecimento do agente de atendimento, com os dados de agora.
+function materialDoSuportify() {
+  const cotados = [];
+  for (const p of listarPacotes().pacotes.filter((x) => x.sourcing)) {
+    try {
+      for (const l of detalharPacote(p.id).linhas) if (l.candidato) cotados.push({ nome: l.produto.nome });
+    } catch (_) { /* pacote sem resultado legivel */ }
+  }
+  return gravarBase({ sugestoes: hoje().sugestoes, emAlta: emAltaGuardado(PERIODOS[0]).subindo, cotados });
+}
+
 // Corpo JSON pequeno de um POST; recusa o que passar do limite.
 function lerCorpo(req) {
   return new Promise((resolve, reject) => {
@@ -431,6 +445,8 @@ function atender(req, res) {
   }
   if (caminho === '/api/integracoes') return json(res, 200, integracoes());
   if (caminho === '/api/produtos') return json(res, 200, produtosDoDia());
+  if (caminho === '/api/cambio') return json(res, 200, cambioGuardado() || { venda: null });
+  if (caminho === '/api/suportify') return json(res, 200, materialDoSuportify());
   if (caminho === '/api/joompro') return json(res, 200, lerJoompro() || { itens: [], consultado_em: null });
   if (caminho === '/api/shopee') return json(res, 200, lerShopee() || { itens: [], consultado_em: null });
   if (caminho === '/api/pedidos') return json(res, 200, { tipos: TIPOS, pedidos: lerPedidos().slice(0, 50) });
@@ -471,6 +487,7 @@ function main() {
   servidor.listen(PORTA, '127.0.0.1', () => {
     log(`central em http://127.0.0.1:${PORTA} | intervalo de ${INTERVALO_MIN} min`);
     if (!credentialsConfigured()) estado.problema = SEM_CREDENCIAL;
+    atualizarCambio();
     // A primeira mineracao espera um pouco, para um reinicio em sequencia nao disparar varias.
     agendar(30 * 1000);
   });

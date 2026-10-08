@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   Activity, ArrowDownRight, ArrowUpRight, BookOpenText, Bot, CheckCircle2, CircleAlert, ClipboardList, Download, FileSpreadsheet,
-  Factory, Globe, LayoutDashboard, Ship, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
+  Factory, Globe, Headset, LayoutDashboard, Search, Ship, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
 } from 'lucide-react';
 import {
-  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarIntegracoes, carregarJoompro, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
+  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarCambio, carregarIntegracoes, carregarJoompro, carregarSuportify, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
   carregarShopee, carregarVisaoGeral, comSupabase, comandarMinerador, criarPedido, gerarPlanilhas, supabase,
 } from './fonte.js';
 import { Aviso, Botao, Card, CardTitulo, Carregando, Indicador, Selo, Tabela } from './ui.jsx';
@@ -30,6 +30,20 @@ function hora(iso) {
 const CDNS = /^https:\/\/[a-z0-9.-]+\.(mlstatic\.com|susercontent\.com|alicdn\.com|joomprocdn\.net)\//i;
 const fotoSegura = (u) => (typeof u === 'string' && CDNS.test(u) ? u : null);
 const linkSeguro = (u) => (typeof u === 'string' && /^https:\/\//i.test(u) ? u : null);
+
+// Texto digitado na busca do topo. As telas de lista filtram por ele.
+const Busca = createContext('');
+const semAcento = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+// Devolve uma funcao que diz se algum dos textos contem todas as palavras da busca.
+function useBusca() {
+  const termos = semAcento(useContext(Busca)).split(/\s+/).filter(Boolean);
+  return (...textos) => {
+    if (!termos.length) return true;
+    const alvo = semAcento(textos.join(' '));
+    return termos.every((t) => alvo.includes(t));
+  };
+}
 
 // Carrega ao abrir e a cada `intervalo` ms; `recarregar` busca de novo na hora.
 function useDados(carregar, intervalo) {
@@ -76,9 +90,9 @@ function Estado({ erro, carregando, dados }) {
 function Marca({ sub }) {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="grid size-8 place-items-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">C</span>
+      <span className="grid size-8 place-items-center rounded-lg bg-linear-to-br from-primary to-[oklch(0.55_0.2_300)] text-sm font-bold text-white shadow-sm">C</span>
       <span className="leading-tight">
-        <span className="block text-sm font-semibold tracking-tight">Conecta Hub Sourcing</span>
+        <span className="block text-sm font-semibold tracking-tight">Conecta Market Sourcing</span>
         <span className="block text-xs text-muted-foreground">{sub}</span>
       </span>
     </div>
@@ -311,7 +325,8 @@ const SITUACOES = {
 function MercadoLivre() {
   const [soAptos, setSoAptos] = useState(true);
   const { dados: d, erro, carregando } = useDados(carregarProdutos, 60000);
-  const itens = d ? d.itens.filter((p) => !soAptos || p.situacao === 'apto') : [];
+  const casa = useBusca();
+  const itens = d ? d.itens.filter((p) => (!soAptos || p.situacao === 'apto') && casa(p.nome, p.categoria, p.id)) : [];
   return (
     <Card>
       <CardTitulo
@@ -399,7 +414,8 @@ const percentual = (v) => (typeof v === 'number' ? `${(v * 100).toLocaleString('
 function China() {
   const [soLotePequeno, setSoLotePequeno] = useState(false);
   const { dados: d, erro, carregando } = useDados(carregarJoompro, 60000);
-  const itens = d ? d.itens.filter((p) => !soLotePequeno || p.lote_pequeno) : [];
+  const casa = useBusca();
+  const itens = d ? d.itens.filter((p) => (!soLotePequeno || p.lote_pequeno) && casa(p.titulo, p.categoria, (p.mercado_livre || {}).titulo)) : [];
   return (
     <Card>
       <CardTitulo
@@ -466,7 +482,8 @@ function PedirAoClaude({ pedido, rotulo }) {
 function Shopee() {
   const [semMarca, setSemMarca] = useState(true);
   const { dados: d, erro, carregando } = useDados(carregarShopee, 60000);
-  const itens = d ? d.itens.filter((p) => !semMarca || !p.tem_marca) : [];
+  const casa = useBusca();
+  const itens = d ? d.itens.filter((p) => (!semMarca || !p.tem_marca) && casa(p.nome, p.categoria, p.loja)) : [];
   return (
     <Card>
       <CardTitulo
@@ -592,17 +609,21 @@ const dolares = (v) => (typeof v === 'number' ? v.toLocaleString('pt-BR', { styl
 
 function Alibaba() {
   const { dados: cotacoes, erro, carregando } = useDados(carregarCotacoesCompletas, 60000);
-  const linhas = (cotacoes || []).flatMap((c) => c.linhas.filter((l) => l.candidato).map((l) => ({ ...l, categoria: c.categoria })));
+  const casa = useBusca();
+  const { dados: cambio } = useDados(carregarCambio, 0);
+  const dolar = cambio && cambio.venda > 0 ? cambio.venda : null;
+  const linhas = (cotacoes || []).flatMap((c) => c.linhas.filter((l) => l.candidato).map((l) => ({ ...l, categoria: c.categoria })))
+    .filter((l) => casa(l.candidato.titulo, l.candidato.fornecedor, l.produto.nome, l.produto.id));
   return (
     <Card>
       <CardTitulo
         titulo="Fornecedores cotados no Alibaba"
-        descricao="Um candidato por produto do Mercado Livre, levantado pelo Accio Work. Preço e MOQ são os do anúncio, em dólares: não é cotação FOB e não inclui frete nem impostos."
+        descricao={`Um candidato por produto do Mercado Livre, levantado pelo Accio Work. Preço e MOQ são os do anúncio, em dólares: não é cotação FOB e não inclui frete nem impostos.${dolar ? ` Conversão para reais pelo PTAX do Banco Central: R$ ${dolar.toFixed(4).replace('.', ',')} em ${cambio.cotado_em}.` : ''}`}
       />
       <Estado erro={erro} carregando={carregando} dados={cotacoes} />
       {cotacoes && (
         <Tabela
-          colunas={[{ titulo: 'Anúncio no Alibaba' }, { titulo: 'Fornecedor' }, { titulo: 'Preço mín.', num: true }, { titulo: 'Preço máx.', num: true }, { titulo: 'MOQ' }, { titulo: 'Aderência', num: true }, { titulo: 'Produto no Mercado Livre' }]}
+          colunas={[{ titulo: 'Anúncio no Alibaba' }, { titulo: 'Fornecedor' }, { titulo: 'Preço mín.', num: true }, { titulo: 'Preço máx.', num: true }, { titulo: 'Mín. em R$ (PTAX)', num: true }, { titulo: 'MOQ' }, { titulo: 'Aderência', num: true }, { titulo: 'Produto no Mercado Livre' }]}
           vazio={!linhas.length && (comSupabase ? 'Nenhuma cotação publicada ainda. Elas aparecem aqui quando o minerador enviar os dados.' : 'Nenhum produto cotado ainda. Peça uma cotação na tela Cotações.')}
         >
           {linhas.map((l) => {
@@ -614,6 +635,7 @@ function Alibaba() {
                 <td className="text-sm break-words">{c.fornecedor}</td>
                 <td className="text-right whitespace-nowrap tabular-nums">{dolares(faixa.min)}</td>
                 <td className="text-right whitespace-nowrap tabular-nums">{dolares(faixa.max)}</td>
+                <td className="text-right whitespace-nowrap tabular-nums">{dolar && typeof faixa.min === 'number' ? reais(faixa.min * dolar) : ''}</td>
                 <td className="whitespace-nowrap">{c.moq}</td>
                 <td className="text-right tabular-nums">{c.aderencia}</td>
                 <td className="min-w-56 text-sm">
@@ -635,7 +657,7 @@ function Alibaba() {
 
 // Junta as tres fontes; uma que falhe nao impede as outras de sair na planilha.
 async function carregarTudoParaORazao() {
-  const [produtos, shopee, cotacoes] = await Promise.allSettled([carregarProdutos(), carregarShopee(), carregarCotacoesCompletas()]);
+  const [produtos, shopee, cotacoes, cambio] = await Promise.allSettled([carregarProdutos(), carregarShopee(), carregarCotacoesCompletas(), carregarCambio()]);
   const falhas = [];
   if (produtos.status === 'rejected') falhas.push('Mercado Livre');
   if (shopee.status === 'rejected') falhas.push('Shopee');
@@ -644,6 +666,7 @@ async function carregarTudoParaORazao() {
     produtos: produtos.status === 'fulfilled' ? produtos.value.itens : [],
     shopee: shopee.status === 'fulfilled' ? shopee.value.itens : [],
     cotacoes: cotacoes.status === 'fulfilled' ? cotacoes.value : [],
+    cambio: cambio.status === 'fulfilled' && cambio.value && cambio.value.venda > 0 ? cambio.value : null,
     falhas,
   };
 }
@@ -692,7 +715,7 @@ function Razao() {
           </div>
           <ul className="mt-4 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
             <li>O composto traz uma linha por produto do Mercado Livre que já foi cotado no Alibaba; a Shopee entra por semelhança de nome, para conferir.</li>
-            <li>Preço do Alibaba é o do anúncio, em dólares, sem conversão: não é cotação FOB.</li>
+            <li>Preço do Alibaba é o do anúncio, em dólares: não é cotação FOB. {d.cambio ? `A coluna em reais usa o PTAX de ${d.cambio.cotado_em} (R$ ${d.cambio.venda.toFixed(4).replace('.', ',')}).` : 'Sem cotação do dólar agora, a coluna em reais sai vazia.'}</li>
             <li>A planilha baixada pelo site não embute fotos; ela traz o link de cada foto.</li>
           </ul>
         </>
@@ -741,6 +764,59 @@ function Pedidos() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Atendimento (Suportify)                                             */
+/* ------------------------------------------------------------------ */
+
+function Copiavel({ titulo, texto, linhas = 3 }) {
+  const [copiado, setCopiado] = useState(false);
+  const copiar = () => navigator.clipboard.writeText(texto).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 1500); });
+  return (
+    <div className="rounded-md border p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="mr-auto text-sm font-semibold">{titulo}</span>
+        <Botao pequeno onClick={copiar}>{copiado ? 'Copiado' : 'Copiar'}</Botao>
+      </div>
+      <textarea readOnly rows={linhas} value={texto} className="w-full resize-y rounded-md border bg-background p-2 font-mono text-xs" aria-label={titulo} />
+    </div>
+  );
+}
+
+function Atendimento() {
+  const { dados: d, erro, carregando } = useDados(carregarSuportify, 0);
+  const baixar = () => {
+    const url = URL.createObjectURL(new Blob([d.texto], { type: 'text/markdown;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = 'base-de-conhecimento-conecta.md';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  return (
+    <Card>
+      <CardTitulo
+        titulo="Agente de atendimento no WhatsApp (Suportify)"
+        descricao="O Suportify atende no WhatsApp quem clica em Cotar importação. Aqui fica o material para criar e manter esse agente: os textos de cada etapa e a base de conhecimento, gerada com os produtos de hoje."
+        acao={d && <Botao variante="primario" onClick={baixar}><Download className="size-4" />Baixar base (.md)</Botao>}
+      />
+      <Estado erro={erro} carregando={carregando} dados={d} />
+      {d && (
+        <div className="grid gap-3">
+          <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+            <li>No Suportify, em Meus agentes, crie um agente e cole o nome e a descrição abaixo na etapa Apresentação.</li>
+            <li>Na etapa Treinamento, envie o arquivo baixado aqui. Baixe e envie de novo quando quiser atualizar os produtos.</li>
+            <li>Cole as regras de comportamento onde o Suportify pede a persona e os limites do agente, teste e ative no seu WhatsApp.</li>
+            <li>Com o número ativo, o botão Cotar importação do site pode abrir a conversa direto com o agente.</li>
+          </ol>
+          <Copiavel titulo="Nome do agente" texto={d.agente.nome} linhas={1} />
+          <Copiavel titulo="Descrição" texto={d.agente.descricao} linhas={2} />
+          <Copiavel titulo="Comportamento e limites" texto={d.agente.comportamento} linhas={9} />
+          <Copiavel titulo={`Base de conhecimento · gerada às ${hora(d.gerado_em)}`} texto={d.texto} linhas={12} />
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Integracoes                                                         */
 /* ------------------------------------------------------------------ */
 
@@ -771,25 +847,29 @@ function Integracoes() {
 /* ------------------------------------------------------------------ */
 
 const TODAS_AS_TELAS = [
-  ['painel', 'Painel', LayoutDashboard, Painel, 'Mineração ao vivo e resumo do dia'],
-  ['alta', 'Em alta', TrendingUp, EmAlta, 'Produtos aptos que subiram no ranking do Mercado Livre'],
-  ['ml', 'Mercado Livre', Store, MercadoLivre, 'Produtos minerados pela API oficial'],
-  ['ml-china', 'ML Internacional · China', Globe, InternacionalChina, 'Mercado Livre, Compra Internacional com envio da China'],
-  ['ml-eua', 'ML Internacional · EUA', Globe, InternacionalEua, 'Mercado Livre, Compra Internacional com envio dos Estados Unidos'],
-  ['china', 'China (JoomPro)', Ship, China, 'Produtos importáveis da China, com par no Mercado Livre'],
-  ['shopee', 'Shopee', ShoppingBag, Shopee, 'Mais vendidos da Shopee Brasil, pelo JoomPulse'],
-  ['alibaba', 'Alibaba', Factory, Alibaba, 'Fornecedores cotados para os produtos do Mercado Livre'],
-  ['cotacoes', 'Cotações', FileSpreadsheet, Cotacoes, 'Pacotes enviados ao Accio Work e comparação lado a lado'],
-  ['razao', 'Razão', BookOpenText, Razao, 'Planilha composta ou de um marketplace por vez'],
-  ['pedidos', 'Pedidos ao Claude', Bot, Pedidos, 'Fila do que só o Claude executa'],
-  ['integracoes', 'Integrações', Plug, Integracoes, 'Situação de cada ligação'],
+  ['painel', 'Painel', LayoutDashboard, Painel, 'Mineração ao vivo e resumo do dia', 'Visão geral'],
+  ['alta', 'Em alta', TrendingUp, EmAlta, 'Produtos aptos que subiram no ranking do Mercado Livre', 'Visão geral'],
+  ['ml', 'Mercado Livre', Store, MercadoLivre, 'Produtos minerados pela API oficial', 'Marketplaces'],
+  ['ml-china', 'ML Internacional · China', Globe, InternacionalChina, 'Mercado Livre, Compra Internacional com envio da China', 'Marketplaces'],
+  ['ml-eua', 'ML Internacional · EUA', Globe, InternacionalEua, 'Mercado Livre, Compra Internacional com envio dos Estados Unidos', 'Marketplaces'],
+  ['china', 'China (JoomPro)', Ship, China, 'Produtos importáveis da China, com par no Mercado Livre', 'Fornecimento'],
+  ['shopee', 'Shopee', ShoppingBag, Shopee, 'Mais vendidos da Shopee Brasil, pelo JoomPulse', 'Marketplaces'],
+  ['alibaba', 'Alibaba', Factory, Alibaba, 'Fornecedores cotados para os produtos do Mercado Livre', 'Fornecimento'],
+  ['cotacoes', 'Cotações', FileSpreadsheet, Cotacoes, 'Pacotes enviados ao Accio Work e comparação lado a lado', 'Fornecimento'],
+  ['razao', 'Razão', BookOpenText, Razao, 'Planilha composta ou de um marketplace por vez', 'Fornecimento'],
+  ['atendimento', 'Atendimento', Headset, Atendimento, 'Agente do Suportify no WhatsApp', 'Operação'],
+  ['pedidos', 'Pedidos ao Claude', Bot, Pedidos, 'Fila do que só o Claude executa', 'Operação'],
+  ['integracoes', 'Integrações', Plug, Integracoes, 'Situação de cada ligação', 'Operação'],
 ];
+const COM_BUSCA = new Set(['ml', 'shopee', 'china', 'alibaba']);
 // Pedidos e Integracoes falam com o backend deste computador; na versao hospedada ficam de fora.
-const TELAS = TODAS_AS_TELAS.filter(([id]) => !comSupabase || !['pedidos', 'integracoes'].includes(id));
+const TELAS = TODAS_AS_TELAS.filter(([id]) => !comSupabase || !['atendimento', 'pedidos', 'integracoes'].includes(id));
+const GRUPOS = [...new Set(TELAS.map((t) => t[5]))];
 
 export default function App() {
   const [sessao, setSessao] = useState(undefined);
   const [tela, setTela] = useState('painel');
+  const [busca, setBusca] = useState('');
 
   useEffect(() => {
     if (!comSupabase) return undefined;
@@ -806,12 +886,17 @@ export default function App() {
     <div className="min-h-screen md:grid md:grid-cols-[232px_1fr]">
       <aside className="border-b bg-sidebar p-3 md:sticky md:top-0 md:h-screen md:border-r md:border-b-0">
         <div className="px-2 py-2"><Marca sub="Sourcing para importação" /></div>
-        <nav className="mt-2 flex gap-1 overflow-x-auto md:mt-4 md:flex-col md:overflow-visible" aria-label="Seções">
-          {TELAS.map(([id, rotulo, Icone]) => (
-            <button key={id} onClick={() => setTela(id)} aria-current={tela === id ? 'page' : undefined}
-              className={`flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition ${tela === id ? 'bg-accent text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
-              <Icone className="size-4" aria-hidden="true" />{rotulo}
-            </button>
+        <nav className="mt-2 flex gap-1 overflow-x-auto md:mt-3 md:block md:max-h-[calc(100vh-150px)] md:overflow-x-visible md:overflow-y-auto" aria-label="Seções">
+          {GRUPOS.map((grupo) => (
+            <div key={grupo} className="contents md:mb-3 md:block">
+              <div className="hidden px-3 pt-2 pb-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase md:block">{grupo}</div>
+              {TELAS.filter((t) => t[5] === grupo).map(([id, rotulo, Icone]) => (
+                <button key={id} onClick={() => setTela(id)} aria-current={tela === id ? 'page' : undefined}
+                  className={`flex shrink-0 items-center gap-2.5 rounded-md px-3 py-1.5 text-sm font-medium transition md:w-full ${tela === id ? 'bg-accent text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
+                  <Icone className="size-4 shrink-0" aria-hidden="true" /><span className="truncate">{rotulo}</span>
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="mt-4 hidden px-3 text-xs text-muted-foreground md:block">
@@ -821,11 +906,20 @@ export default function App() {
         </div>
       </aside>
       <div className="min-w-0">
-        <header className="border-b px-4 py-4 md:px-8">
-          <h1 className="text-xl font-semibold tracking-tight">{titulo}</h1>
-          <p className="text-sm text-muted-foreground">{subtitulo}</p>
+        <header className="flex flex-wrap items-center gap-3 border-b bg-card/60 px-4 py-4 backdrop-blur md:sticky md:top-0 md:z-10 md:px-8">
+          <div className="mr-auto min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight">{titulo}</h1>
+            <p className="text-sm text-muted-foreground">{subtitulo}</p>
+          </div>
+          {COM_BUSCA.has(tela) && (
+            <label className="relative block w-full sm:w-72">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <input type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar produto, categoria ou código"
+                aria-label="Buscar nesta lista" className="h-9 w-full rounded-md border bg-background pr-3 pl-9 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+            </label>
+          )}
         </header>
-        <main className="px-4 py-5 md:px-8"><Tela /></main>
+        <main className="px-4 py-5 md:px-8"><Busca.Provider value={COM_BUSCA.has(tela) ? busca : ''}><Tela /></Busca.Provider></main>
         <footer className="px-4 pb-6 text-xs text-muted-foreground md:px-8">
           A API do Mercado Livre informa posição no ranking, não quantidade vendida. Vendas e faturamento, quando aparecem, são estimativas do JoomPulse. Preço do Alibaba é preço de anúncio, não cotação FOB.
         </footer>

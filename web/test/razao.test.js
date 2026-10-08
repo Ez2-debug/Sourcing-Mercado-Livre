@@ -36,6 +36,9 @@ test('o composto junta os tres marketplaces em uma linha e traz as abas completa
   assert.equal(de(primeira, 'NCM sugerida'), 'posição 91.05');
   assert.equal(de(primeira, 'Alibaba: preço mín. (US$)'), 2.95);
   assert.equal(de(primeira, 'Alibaba: preço máx. (US$)'), 3.4);
+  assert.equal(de(primeira, 'Alibaba: preço mín. (R$, PTAX)'), undefined, 'sem cambio a coluna fica vazia');
+  const comCambio = montarRazao('composto', { ...entrada, cambio: { venda: 5, fonte: 'PTAX', cotado_em: '2026-10-08 13:08' } });
+  assert.equal(de(comCambio.abas[0].linhas[0], 'Alibaba: preço mín. (R$, PTAX)'), 14.75);
   assert.equal(de(primeira, 'Shopee: preço (R$)'), 21.5);
   assert.equal(de(primeira, 'Shopee: cruzamento'), 'Por semelhança; conferir');
   assert.equal(de(segunda, 'Alibaba: anúncio'), 'Sem candidato');

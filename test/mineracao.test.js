@@ -600,3 +600,26 @@ test('normaliza o catalogo JoomPro e so aceita enderecos dos dominios esperados'
   const consulta = JSON.parse(consultaJoompro());
   assert.deepEqual(consulta.order, [['JprProductsMeli.qualityScore', 'desc']], 'nunca ordena por margem');
 });
+
+test('a base do Suportify nao afirma vendas e encaminha a cotacao a equipe', () => {
+  const { AGENTE, montarBase } = require('../server/suportify');
+  const base = montarBase({
+    sugestoes: [{ id: 'MLB1', nome: 'Porta   Joias 3 Camadas', categoria: 'Joias', menor_preco: 75.65, ncm: 'posição 42.02' }],
+    emAlta: [{ nome: 'Mesa Dobravel', posicao_anterior: 6, posicao: 5 }],
+    cotados: [{ nome: 'Relogio De Parede' }],
+  }, new Date('2026-10-08T12:00:00Z'));
+  assert.match(base, /Pergunta: Fale sobre o produto Porta Joias 3 Camadas\nResposta: .*R\$ 75,65.*MLB1/);
+  assert.match(base, /foi do 6º para o 5º lugar/);
+  assert.match(base, /não de quantidade vendida/);
+  assert.match(AGENTE.comportamento, /Nunca informe quantidade vendida/);
+  assert.match(AGENTE.comportamento, /não feche pedido/);
+});
+
+test('o cambio usa a cotacao guardada quando a rede falha e grava a nova quando chega', async () => {
+  const { atualizarCambio, cambioGuardado } = require('../server/cambio');
+  assert.equal(await atualizarCambio(async () => { throw new Error('sem rede'); }), null);
+  const novo = await atualizarCambio(async () => ({ ok: true, json: async () => ({ value: [{ cotacaoCompra: 5.01, cotacaoVenda: 5.0119, dataHoraCotacao: '2026-10-08 13:08:16.814' }] }) }));
+  assert.equal(novo.venda, 5.0119);
+  assert.equal(novo.cotado_em, '2026-10-08 13:08');
+  assert.equal(cambioGuardado().venda, 5.0119);
+});

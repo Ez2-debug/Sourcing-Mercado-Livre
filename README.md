@@ -1,4 +1,4 @@
-# Conecta Hub Sourcing
+# Conecta Market Sourcing
 
 Servidor MCP local que minera produtos do Mercado Livre Brasil por categoria e entrega o resultado ao Accio Work, para apoiar decisões de sourcing e importação da Conecta Hub.
 

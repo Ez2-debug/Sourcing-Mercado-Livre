@@ -87,12 +87,15 @@ function abaShopee(itens) {
 
 const cruzamento = (l) => (!l.candidato ? '' : (l.cruzamento === 'codigo' ? 'Pelo código' : 'Por semelhança; conferir'));
 
-function abaAlibaba(linhas, ncmPorProduto) {
+// Preco em dolar convertido pelo PTAX; vazio sem cotacao.
+const emReais = (usd, cambio) => (typeof usd === 'number' && cambio && cambio.venda > 0 ? Math.round(usd * cambio.venda * 100) / 100 : undefined);
+
+function abaAlibaba(linhas, ncmPorProduto, cambio) {
   return {
     nome: 'Alibaba',
     colunas: [
       ['Código', 15], ['Produto no Mercado Livre', 46], ['NCM sugerida', 16], ['Anúncio no Alibaba', 52], ['Fornecedor', 34],
-      ['Preço do anúncio (US$)', 16], ['Preço mínimo (US$)', 12, 'dolar'], ['Preço máximo (US$)', 12, 'dolar'], ['MOQ do anúncio', 16],
+      ['Preço do anúncio (US$)', 16], ['Preço mínimo (US$)', 12, 'dolar'], ['Preço máximo (US$)', 12, 'dolar'], ['Preço mínimo (R$, PTAX)', 13, 'reais'], ['MOQ do anúncio', 16],
       ['Local', 22], ['Aderência (Accio)', 11], ['Cruzamento', 20], ['Observação do Accio', 60], ['Link do anúncio', 46], ['Categoria do pacote', 34],
     ],
     linhas: linhas.map((l) => {
@@ -100,20 +103,20 @@ function abaAlibaba(linhas, ncmPorProduto) {
       const faixa = faixaDePreco(c.preco);
       return [
         l.produto.id, l.produto.nome, ncmPorProduto.get(l.produto.id) || '', c.titulo ? link(c.titulo, c.link) : 'Sem candidato', c.fornecedor || '',
-        c.preco || '', faixa.min, faixa.max, c.moq || '', c.local || '', c.aderencia || '', cruzamento(l), c.motivo || '', link(c.link, c.link), l.categoria || '',
+        c.preco || '', faixa.min, faixa.max, emReais(faixa.min, cambio), c.moq || '', c.local || '', c.aderencia || '', cruzamento(l), c.motivo || '', link(c.link, c.link), l.categoria || '',
       ];
     }),
   };
 }
 
-function abaComposta(linhas, produtos, shopee) {
+function abaComposta(linhas, produtos, shopee, cambio) {
   const porId = new Map(produtos.map((p) => [p.id, p]));
   return {
     nome: 'Razão composto',
     colunas: [
       ['#', 5, 'inteiro'], ['Código', 15], ['Produto no Mercado Livre', 52], ['ML: menor preço (R$)', 13, 'reais'], ['ML: posição', 9, 'inteiro'],
       ['ML: vendas est. (un.)', 12, 'inteiro'], ['NCM sugerida', 16], ['Alibaba: anúncio', 46], ['Alibaba: fornecedor', 30],
-      ['Alibaba: preço mín. (US$)', 13, 'dolar'], ['Alibaba: preço máx. (US$)', 13, 'dolar'], ['Alibaba: MOQ', 15], ['Alibaba: aderência', 10],
+      ['Alibaba: preço mín. (US$)', 13, 'dolar'], ['Alibaba: preço máx. (US$)', 13, 'dolar'], ['Alibaba: preço mín. (R$, PTAX)', 13, 'reais'], ['Alibaba: MOQ', 15], ['Alibaba: aderência', 10],
       ['Alibaba: cruzamento', 20], ['Shopee: produto parecido', 46], ['Shopee: preço (R$)', 12, 'reais'], ['Shopee: vendas est. 30 dias', 13, 'inteiro'],
       ['Shopee: cruzamento', 20],
     ],
@@ -124,7 +127,7 @@ function abaComposta(linhas, produtos, shopee) {
       const s = parecidoNaShopee(l.produto.nome, shopee);
       return [
         i + 1, l.produto.id, link(l.produto.nome, l.produto.link), l.produto.menor_preco === undefined ? ml.menor_preco : l.produto.menor_preco,
-        ml.posicao, ml.vendas_estimadas, ml.ncm || '', c.titulo ? link(c.titulo, c.link) : 'Sem candidato', c.fornecedor || '', faixa.min, faixa.max,
+        ml.posicao, ml.vendas_estimadas, ml.ncm || '', c.titulo ? link(c.titulo, c.link) : 'Sem candidato', c.fornecedor || '', faixa.min, faixa.max, emReais(faixa.min, cambio),
         c.moq || '', c.aderencia || '', cruzamento(l), s ? link(s.nome, s.link) : '', s ? s.preco : undefined, s ? s.vendas_30_dias : undefined,
         s ? 'Por semelhança; conferir' : '',
       ];
@@ -144,7 +147,8 @@ function abaSobre(tipo, dados) {
   notas.push(
     ['Mercado Livre', 'A API informa posição no ranking, não quantidade vendida. Vendas, avaliações e nota são estimativas do JoomPulse, quando registradas.'],
     ['Shopee', 'Vendas e faturamento são estimativas do JoomPulse a partir do contador público arredondado da Shopee; não são vendas reais.'],
-    ['Alibaba', 'Preço e MOQ são os do anúncio, em dólares. Não é cotação FOB: frete, impostos e condições só saem com pedido ao fornecedor. Não há conversão de moeda nesta planilha.'],
+    ['Alibaba', 'Preço e MOQ são os do anúncio, em dólares. Não é cotação FOB: frete, impostos e condições só saem com pedido ao fornecedor.'],
+    ['Conversão para reais', dados.cambio && dados.cambio.venda ? `Dólar a R$ ${dados.cambio.venda.toFixed(4).replace('.', ',')} (${dados.cambio.fonte}, cotação de ${dados.cambio.cotado_em}). É só conversão de moeda do preço de anúncio: não inclui frete nem impostos e não é custo de importação.` : 'Sem cotação do dólar disponível; a coluna em reais sai vazia.'],
     ['NCM sugerida', 'Ponto de partida para o despachante; não é classificação fiscal e não traz alíquota.'],
     ['Fotos', 'A planilha gerada pelo site não embute fotos; a coluna Link da foto aponta para a imagem.'],
   );
@@ -161,15 +165,16 @@ export function montarRazao(tipo, entrada) {
   const shopee = entrada.shopee || [];
   const linhas = (entrada.cotacoes || []).flatMap((c) => (c.linhas || []).map((l) => ({ ...l, categoria: c.categoria })));
   const ncm = new Map(produtos.filter((p) => p.ncm).map((p) => [p.id, p.ncm]));
-  const dados = { produtos, shopee, linhas };
+  const cambio = entrada.cambio || null;
+  const dados = { produtos, shopee, linhas, cambio };
   const dia = new Date().toISOString().slice(0, 10);
   const rotulo = TIPOS_DE_RAZAO.find(([id]) => id === tipo);
   if (!rotulo) throw new Error(`tipo de razão desconhecido: ${tipo}`);
   let abas;
-  if (tipo === 'composto') abas = [abaComposta(linhas, produtos, shopee), abaMercadoLivre(produtos), abaAlibaba(linhas, ncm), abaShopee(shopee)];
+  if (tipo === 'composto') abas = [abaComposta(linhas, produtos, shopee, cambio), abaMercadoLivre(produtos), abaAlibaba(linhas, ncm, cambio), abaShopee(shopee)];
   else if (tipo === 'mercado-livre') abas = [abaMercadoLivre(produtos)];
   else if (tipo === 'shopee') abas = [abaShopee(shopee)];
-  else abas = [abaAlibaba(linhas, ncm)];
+  else abas = [abaAlibaba(linhas, ncm, cambio)];
   return {
     arquivo: `Razao ${rotulo[1]} ${dia}.xlsx`,
     abas: [...abas, abaSobre(tipo, dados)],

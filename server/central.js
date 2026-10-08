@@ -13,7 +13,7 @@ function centralHtml() {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Conecta Hub Sourcing</title>
+<title>Conecta Market Sourcing</title>
 <style>
   :root { color-scheme: light; --plano:#f9f9f7; --cartao:#fcfcfb; --tinta:#0b0b0b; --tinta2:#52514e; --suave:#898781; --grade:#e1e0d9; --borda:rgba(11,11,11,.10); --serie:#2a78d6; --trilho:#cde2fb; --link:#1c5cab; --ok:#1f8a4c; --okfundo:#dff3e6; --alerta:#9a6700; --alertafundo:#fdf0cf; --erro:#b3261e; --errofundo:#fbe3e1; }
   @media (prefers-color-scheme: dark) { :root { color-scheme: dark; --plano:#0d0d0d; --cartao:#1a1a19; --tinta:#fff; --tinta2:#c3c2b7; --suave:#898781; --grade:#2c2c2a; --borda:rgba(255,255,255,.10); --serie:#3987e5; --trilho:#0d366b; --link:#86b6ef; --ok:#5fcf8c; --okfundo:#12331f; --alerta:#f2c25b; --alertafundo:#3a2c08; --erro:#f2877f; --errofundo:#3d1512; } }
@@ -97,7 +97,7 @@ function centralHtml() {
 <body>
 <header>
   <div class="faixa">
-    <div class="marca"><span class="logo">C</span><span>Conecta Hub Sourcing<small>Central de mineração · Mercado Livre Brasil</small></span></div>
+    <div class="marca"><span class="logo">C</span><span>Conecta Market Sourcing<small>Central de mineração · Mercado Livre Brasil</small></span></div>
     <span id="pilula" class="pilula"><span class="ponto"></span><span id="pilula-texto">Conectando</span></span>
     <button id="pausar">Pausar</button>
     <button id="agora" class="principal">Minerar agora</button>
