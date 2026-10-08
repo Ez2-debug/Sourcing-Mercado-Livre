@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Activity, ArrowDownRight, ArrowUpRight, BookOpenText, Bot, CheckCircle2, CircleAlert, ClipboardList, Download, FileSpreadsheet,
-  LayoutDashboard, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
+  Factory, LayoutDashboard, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
 } from 'lucide-react';
 import {
   COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarIntegracoes, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
   carregarShopee, carregarVisaoGeral, comSupabase, comandarMinerador, criarPedido, gerarPlanilhas, supabase,
 } from './fonte.js';
 import { Aviso, Botao, Card, CardTitulo, Carregando, Indicador, Selo, Tabela } from './ui.jsx';
-import { TIPOS_DE_RAZAO, montarRazao } from './razao.js';
+import { TIPOS_DE_RAZAO, faixaDePreco, montarRazao } from './razao.js';
 import { baixarPlanilha } from './planilha.js';
 
 /* ------------------------------------------------------------------ */
@@ -372,7 +372,9 @@ function Shopee() {
         titulo="Mais vendidos na Shopee Brasil"
         descricao={d && d.consultado_em
           ? `Leitura de ${hora(d.consultado_em)}, pelo JoomPulse. Vendas e faturamento são estimativas do JoomPulse a partir do contador público arredondado da Shopee; não são vendas reais.`
-          : 'Ainda sem leitura. Os dados vêm do JoomPulse, que só o Claude alcança: peça a atualização.'}
+          : (comSupabase
+            ? 'Ainda não há leitura da Shopee publicada. Ela aparece aqui quando o minerador enviar os dados.'
+            : 'Ainda sem leitura. Os dados vêm do JoomPulse, que só o Claude alcança: peça a atualização.')}
         acao={<div className="flex flex-wrap items-center gap-2"><Alternador opcoes={[[true, 'Sem marca'], [false, 'Todos']]} valor={semMarca} aoMudar={setSemMarca} /><PedirAoClaude pedido={{ tipo: 'shopee' }} rotulo="Pedir atualização" /></div>}
       />
       <Estado erro={erro} carregando={carregando} dados={d} />
@@ -456,7 +458,7 @@ function Cotacoes() {
         <CardTitulo titulo="Pacotes e cotações" descricao="Cada mineração do Mercado Livre gera um pacote com os produtos aptos. O Accio Work cota esses produtos no Alibaba; o pedido é levado ao Accio pelo Claude." />
         <Estado erro={erro} carregando={carregando} dados={d} />
         {d && (
-          <Tabela colunas={[{ titulo: 'Minerado em' }, { titulo: 'Categoria' }, { titulo: 'Produtos', num: true }, { titulo: 'Cotação no Alibaba' }, { titulo: 'Ações' }]} vazio={!d.pacotes.length && 'Nenhum pacote gravado ainda.'}>
+          <Tabela colunas={[{ titulo: 'Minerado em' }, { titulo: 'Categoria' }, { titulo: 'Produtos', num: true }, { titulo: 'Cotação no Alibaba' }, { titulo: 'Ações' }]} vazio={!d.pacotes.length && (comSupabase ? 'Nenhuma cotação publicada ainda. Elas aparecem aqui quando o minerador enviar os dados.' : 'Nenhum pacote gravado ainda.')}>
             {d.pacotes.map((p) => (
               <tr key={p.id}>
                 <td className="whitespace-nowrap">{hora(p.minerado_em)}</td>
@@ -478,6 +480,51 @@ function Cotacoes() {
       </Card>
       {aberto && <Cotacao key={aberto.id} pacote={aberto} />}
     </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Alibaba                                                             */
+/* ------------------------------------------------------------------ */
+
+const dolares = (v) => (typeof v === 'number' ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'USD' }) : '');
+
+function Alibaba() {
+  const { dados: cotacoes, erro, carregando } = useDados(carregarCotacoesCompletas, 60000);
+  const linhas = (cotacoes || []).flatMap((c) => c.linhas.filter((l) => l.candidato).map((l) => ({ ...l, categoria: c.categoria })));
+  return (
+    <Card>
+      <CardTitulo
+        titulo="Fornecedores cotados no Alibaba"
+        descricao="Um candidato por produto do Mercado Livre, levantado pelo Accio Work. Preço e MOQ são os do anúncio, em dólares: não é cotação FOB e não inclui frete nem impostos."
+      />
+      <Estado erro={erro} carregando={carregando} dados={cotacoes} />
+      {cotacoes && (
+        <Tabela
+          colunas={[{ titulo: 'Anúncio no Alibaba' }, { titulo: 'Fornecedor' }, { titulo: 'Preço mín.', num: true }, { titulo: 'Preço máx.', num: true }, { titulo: 'MOQ' }, { titulo: 'Aderência', num: true }, { titulo: 'Produto no Mercado Livre' }]}
+          vazio={!linhas.length && (comSupabase ? 'Nenhuma cotação publicada ainda. Elas aparecem aqui quando o minerador enviar os dados.' : 'Nenhum produto cotado ainda. Peça uma cotação na tela Cotações.')}
+        >
+          {linhas.map((l) => {
+            const c = l.candidato;
+            const faixa = faixaDePreco(c.preco);
+            return (
+              <tr key={`${l.produto.id}-${c.link || c.titulo}`}>
+                <td className="min-w-64"><div className="flex items-center gap-3"><Foto src={c.foto} /><div className="min-w-0"><div className="break-words"><Nome nome={c.titulo} link={c.link} /></div><div className="text-xs text-muted-foreground">{c.local}</div></div></div></td>
+                <td className="text-sm break-words">{c.fornecedor}</td>
+                <td className="text-right whitespace-nowrap tabular-nums">{dolares(faixa.min)}</td>
+                <td className="text-right whitespace-nowrap tabular-nums">{dolares(faixa.max)}</td>
+                <td className="whitespace-nowrap">{c.moq}</td>
+                <td className="text-right tabular-nums">{c.aderencia}</td>
+                <td className="min-w-56 text-sm">
+                  <div className="break-words"><Nome nome={l.produto.nome} link={l.produto.link} /></div>
+                  <div className="text-xs text-muted-foreground">{[reais(l.produto.menor_preco), l.produto.id, l.cruzamento === 'codigo' ? '' : 'cruzado por semelhança; conferir'].filter(Boolean).join(' · ')}</div>
+                </td>
+              </tr>
+            );
+          })}
+        </Tabela>
+      )}
+    </Card>
   );
 }
 
@@ -627,7 +674,8 @@ const TODAS_AS_TELAS = [
   ['alta', 'Em alta', TrendingUp, EmAlta, 'Produtos aptos que subiram no ranking do Mercado Livre'],
   ['ml', 'Mercado Livre', Store, MercadoLivre, 'Produtos minerados pela API oficial'],
   ['shopee', 'Shopee', ShoppingBag, Shopee, 'Mais vendidos da Shopee Brasil, pelo JoomPulse'],
-  ['cotacoes', 'Cotações', FileSpreadsheet, Cotacoes, 'Accio Work e Alibaba'],
+  ['alibaba', 'Alibaba', Factory, Alibaba, 'Fornecedores cotados para os produtos do Mercado Livre'],
+  ['cotacoes', 'Cotações', FileSpreadsheet, Cotacoes, 'Pacotes enviados ao Accio Work e comparação lado a lado'],
   ['razao', 'Razão', BookOpenText, Razao, 'Planilha composta ou de um marketplace por vez'],
   ['pedidos', 'Pedidos ao Claude', Bot, Pedidos, 'Fila do que só o Claude executa'],
   ['integracoes', 'Integrações', Plug, Integracoes, 'Situação de cada ligação'],
