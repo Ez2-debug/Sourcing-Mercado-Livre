@@ -67,7 +67,7 @@ const COLUNAS = [
   ['Foto', 14], ['Produto', 58], ['Categoria no Mercado Livre', 40], ['Posição no ranking', 11],
   ['Menor preço (R$)', 13], ['Anúncios', 10], ['Vendedores', 11], ['Marca no anúncio', 22],
   ['Tipo de marca', 14], ['Situação na triagem', 20], ['Alertas', 14], ['NCM sugerida', 16],
-  ['Prioridade', 11], ['No catálogo desde', 13], ['Meses no catálogo', 11], ['Tendência no ranking', 20], ['Vendas estimadas (un.)', 12], ['Faturamento estimado (R$)', 14], ['Fonte e período', 18], ['Tendência (fonte externa)', 24], ['Termos em alta', 26], ['Link do produto', 46],
+  ['Prioridade', 11], ['No catálogo desde', 13], ['Meses no catálogo', 11], ['Tendência no ranking', 20], ['Vendas estimadas (un.)', 12], ['Faturamento estimado (R$)', 14], ['Avaliações (qtd.)', 12], ['Nota (0 a 5)', 9], ['Fonte e período', 18], ['Tendência (fonte externa)', 24], ['Termos em alta', 26], ['Link do produto', 46],
   ['Link do menor preço', 46], ['Link da foto', 46], ['Mineração', 26],
 ];
 
@@ -100,6 +100,8 @@ function linhaDoProduto(m, p, anterior) {
       { v: tendenciaNoRanking(p, anterior), s: t },
       { v: est ? est.vendas : undefined, s: ESTILO.centro },
       { v: est ? est.faturamento : undefined, s: ESTILO.dinheiro },
+      { v: est ? est.avaliacoes : undefined, s: ESTILO.centro },
+      { v: est ? est.avaliacao : undefined, s: ESTILO.centro },
       { v: fonteEPeriodo, s: t },
       { v: textoDaTendenciaExterna(est), s: t },
       { v: (p.tendencias_relacionadas || []).join(', '), s: t },
@@ -126,6 +128,7 @@ function abaSobre(mineracoes, total, semDetalhe, comFoto) {
     ['Tendência no ranking', 'Compara a posição do produto com a mineração anterior da mesma categoria: entrou, subiu, desceu ou ficou estável. Fica vazia na primeira mineração da categoria. É a posição no ranking do Mercado Livre, não volume de vendas.'],
     ['Tendência (fonte externa)', 'Tendência ou crescimento informado pela fonte externa de estimativas, quando houver.'],
     ['Vendas e faturamento estimados', 'Só aparecem quando uma fonte externa foi registrada (por exemplo JoomPulse), no período indicado na coluna ao lado. São estimativas da fonte, calculadas por ela a partir do histórico dos anúncios; não são vendas reais nem dado do Mercado Livre.'],
+    ['Avaliações e nota', 'Quantidade de avaliações de compradores e nota média do produto, como aparecem ao lado das estrelas na página do Mercado Livre, informadas pela fonte externa. Avaliação não é venda: só parte dos compradores avalia, então o número de vendas é sempre maior.'],
     ['Links', 'Montados pelo padrão de endereços do site, não devolvidos pela API; algum pode não abrir.'],
     ['Fotos', 'Fotos do catálogo do Mercado Livre, copiadas para dentro da planilha. A coluna Link da foto aponta para a imagem original.'],
   ];
