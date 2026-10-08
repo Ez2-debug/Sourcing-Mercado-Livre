@@ -83,6 +83,16 @@ function Marca({ sub }) {
   );
 }
 
+// O Supabase devolve motivos diferentes para a recusa; cada um pede uma acao diferente.
+function motivoDoLogin(error) {
+  const m = String(error.message || '');
+  if (/invalid login credentials/i.test(m)) return 'E-mail ou senha não conferem. O acesso é criado pelo administrador; não é a senha do GitHub nem a do Supabase.';
+  if (/email not confirmed/i.test(m)) return 'Este e-mail ainda não foi confirmado. Peça ao administrador para confirmar o usuário.';
+  if (/api key|apikey|jwt/i.test(m)) return 'O site está com a chave pública do Supabase errada. Avise o administrador.';
+  if (/failed to fetch|network/i.test(m)) return 'Não consegui falar com o servidor. Confira a conexão e tente de novo.';
+  return `Não foi possível entrar: ${m || 'erro desconhecido'}.`;
+}
+
 function Login() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -94,7 +104,7 @@ function Login() {
     setEnviando(true);
     setErro(null);
     const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
-    if (error) setErro('E-mail ou senha não conferem.');
+    if (error) setErro(motivoDoLogin(error));
     setEnviando(false);
   }
 
