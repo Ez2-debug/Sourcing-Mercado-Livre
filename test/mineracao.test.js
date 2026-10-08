@@ -607,8 +607,11 @@ test('a base do Suportify nao afirma vendas e encaminha a cotacao a equipe', () 
     sugestoes: [{ id: 'MLB1', nome: 'Porta   Joias 3 Camadas', categoria: 'Joias', menor_preco: 75.65, ncm: 'posição 42.02' }],
     emAlta: [{ nome: 'Mesa Dobravel', posicao_anterior: 6, posicao: 5 }],
     cotados: [{ nome: 'Relogio De Parede' }],
-  }, new Date('2026-10-08T12:00:00Z'));
-  assert.match(base, /Pergunta: Fale sobre o produto Porta Joias 3 Camadas\nResposta: .*R\$ 75,65.*MLB1/);
+  });
+  assert.match(base, /PERGUNTA: Fale sobre o produto Porta Joias 3 Camadas\nRESPOSTA: .*R\$ 75,65.*MLB1/);
+  // Toda linha e uma pergunta, uma resposta ou o separador: nada de titulo solto.
+  assert.ok(base.trim().split('\n').every((l) => /^(PERGUNTA: .+|RESPOSTA: .+|#)$/.test(l)));
+  assert.match(base, /^PERGUNTA: /);
   assert.match(base, /foi do 6º para o 5º lugar/);
   assert.match(base, /não de quantidade vendida/);
   assert.match(AGENTE.comportamento, /Nunca informe quantidade vendida/);

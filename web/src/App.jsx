@@ -789,7 +789,7 @@ function Atendimento() {
   const baixar = () => {
     const url = URL.createObjectURL(new Blob([d.texto], { type: 'text/markdown;charset=utf-8' }));
     const a = document.createElement('a');
-    a.href = url; a.download = 'base-de-conhecimento-conecta.md';
+    a.href = url; a.download = 'base-de-conhecimento-conecta.txt';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
@@ -798,7 +798,7 @@ function Atendimento() {
       <CardTitulo
         titulo="Agente de atendimento no WhatsApp (Suportify)"
         descricao="O Suportify atende no WhatsApp quem clica em Cotar importação. Aqui fica o material para criar e manter esse agente: os textos de cada etapa e a base de conhecimento, gerada com os produtos de hoje."
-        acao={d && <Botao variante="primario" onClick={baixar}><Download className="size-4" />Baixar base (.md)</Botao>}
+        acao={d && <Botao variante="primario" onClick={baixar}><Download className="size-4" />Baixar base (.txt)</Botao>}
       />
       <Estado erro={erro} carregando={carregando} dados={d} />
       {d && (

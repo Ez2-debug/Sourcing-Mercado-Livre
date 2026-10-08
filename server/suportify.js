@@ -40,16 +40,14 @@ function pastaSuportify() {
 
 const reais = (v) => (typeof v === 'number' ? `R$ ${v.toFixed(2).replace('.', ',')}` : null);
 const umaLinha = (s) => String(s || '').replace(/\s+/g, ' ').trim();
-const pergunta = (p, r) => `Pergunta: ${umaLinha(p)}\nResposta: ${umaLinha(r)}\n`;
+// O formato que o Suportify le: rotulos em maiusculas e uma linha "#" entre
+// os pares. Titulos e textos soltos fazem o arquivo ser recusado.
+const pergunta = (p, r) => `PERGUNTA: ${umaLinha(p)}\nRESPOSTA: ${umaLinha(r)}`;
 
 // entrada: { sugestoes, emAlta, cotados } com os dados do dia.
-function montarBase(entrada, agora) {
+function montarBase(entrada) {
   const e = entrada || {};
-  const quando = (agora || new Date()).toLocaleDateString('pt-BR');
   const blocos = [
-    '# Base de conhecimento — Conecta Market Sourcing',
-    `Atualizada em ${quando}.`,
-    '## Sobre o serviço',
     pergunta('O que é a Conecta Market Sourcing?', 'É um serviço que acompanha todos os dias os produtos mais bem colocados no Mercado Livre e na Shopee, separa os que podem ser importados sem marca e levanta fornecedores na China para cotação.'),
     pergunta('Como vocês escolhem os produtos?', 'Lemos o ranking oficial de cada categoria do Mercado Livre, descartamos marcas conhecidas, produtos proibidos e os que exigem Anvisa, Anatel ou Inmetro, e acompanhamos quem sobe de posição ao longo dos dias.'),
     pergunta('Vocês informam quantas unidades um produto vende?', 'Não como fato. O Mercado Livre informa a posição no ranking, não a quantidade vendida. Quando mostramos vendas, é uma estimativa de terceiros e vem identificada como estimativa.'),
@@ -60,7 +58,6 @@ function montarBase(entrada, agora) {
   ];
   // O assistente do Suportify nao tem campo proprio para as regras de
   // comportamento: elas entram na base, como perguntas e respostas.
-  blocos.push('## Regras de atendimento');
   blocos.push(pergunta('Quem é você e como deve atender?', 'Sou o atendente da Conecta Market Sourcing. Atendo em português do Brasil, com mensagens curtas e cordiais, uma pergunta por vez, e respondo só com o que está nesta base de conhecimento.'));
   blocos.push(pergunta('O que fazer quando não souber a resposta?', 'Dizer que não tem essa informação e que vai encaminhar a dúvida à equipe da Conecta. Nunca inventar preço, prazo, quantidade vendida ou imposto.'));
   blocos.push(pergunta('Qual é o custo total para importar um produto?', 'Não informo custo total. O valor depende da quantidade, do frete, dos impostos e da cotação formal com o fornecedor. Posso encaminhar o pedido de cotação: preciso do seu nome, do produto e da quantidade pretendida.'));
@@ -71,7 +68,6 @@ function montarBase(entrada, agora) {
   blocos.push(pergunta('Tenho uma reclamação ou um problema com um pedido', 'Sinto muito pelo transtorno. Vou encaminhar agora para a equipe da Conecta, que cuida do seu caso.'));
   const sugestoes = (e.sugestoes || []).slice(0, 10);
   if (sugestoes.length) {
-    blocos.push('## Produtos em destaque hoje');
     blocos.push(pergunta('Quais produtos estão em destaque hoje?',
       `${sugestoes.map((s) => umaLinha(s.nome)).join('; ')}. São produtos sem marca conhecida e bem colocados no ranking de suas categorias.`));
     for (const s of sugestoes) {
@@ -82,17 +78,15 @@ function montarBase(entrada, agora) {
   }
   const subindo = (e.emAlta || []).slice(0, 8);
   if (subindo.length) {
-    blocos.push('## Produtos subindo no ranking');
     blocos.push(pergunta('Quais produtos estão subindo no ranking?',
       `${subindo.map((p) => `${umaLinha(p.nome)} (foi do ${p.posicao_anterior}º para o ${p.posicao}º lugar)`).join('; ')}. A subida é de posição no ranking do Mercado Livre, não de quantidade vendida.`));
   }
   const cotados = (e.cotados || []).slice(0, 15);
   if (cotados.length) {
-    blocos.push('## Produtos que já têm fornecedor levantado');
     blocos.push(pergunta('Para quais produtos vocês já têm fornecedor?',
       `${cotados.map((c) => umaLinha(c.nome)).join('; ')}. Para esses já existe um fornecedor levantado; a cotação formal é feita pela equipe.`));
   }
-  return `${blocos.join('\n\n')}\n`;
+  return `${blocos.join('\n#\n')}\n`;
 }
 
 function gravarBase(entrada) {
