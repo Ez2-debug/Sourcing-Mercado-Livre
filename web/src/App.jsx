@@ -665,6 +665,7 @@ async function carregarTudoParaORazao() {
   return {
     produtos: produtos.status === 'fulfilled' ? produtos.value.itens : [],
     shopee: shopee.status === 'fulfilled' ? shopee.value.itens : [],
+    relacionados: shopee.status === 'fulfilled' ? (shopee.value.relacionados || []) : [],
     cotacoes: cotacoes.status === 'fulfilled' ? cotacoes.value : [],
     cambio: cambio.status === 'fulfilled' && cambio.value && cambio.value.venda > 0 ? cambio.value : null,
     falhas,
@@ -714,7 +715,9 @@ function Razao() {
             {situacao && <span className="text-sm break-words text-muted-foreground">{situacao}</span>}
           </div>
           <ul className="mt-4 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
-            <li>O composto traz uma linha por produto do Mercado Livre que já foi cotado no Alibaba; a Shopee entra por semelhança de nome, para conferir.</li>
+            <li>O composto abre em um painel com premissas editáveis (dólar, custos adicionais e comissão): custo, margem e investimento são fórmulas e recalculam quando você muda as premissas.</li>
+            <li>Cada produto tem uma coluna Decisão com lista (Cotar, Aguardar, Descartar), e o painel soma o investimento dos marcados como Cotar.</li>
+            <li>A Shopee entra por semelhança de nome, para conferir.</li>
             <li>Preço do Alibaba é o do anúncio, em dólares: não é cotação FOB. {d.cambio ? `A coluna em reais usa o PTAX de ${d.cambio.cotado_em} (R$ ${d.cambio.venda.toFixed(4).replace('.', ',')}).` : 'Sem cotação do dólar agora, a coluna em reais sai vazia.'}</li>
             <li>A planilha baixada pelo site não embute fotos; ela traz o link de cada foto.</li>
           </ul>

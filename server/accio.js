@@ -13,7 +13,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { ToolError } = require('./meli');
-const { pastaAccio } = require('./saida');
+const { pastaAccio, pastaMineracoes } = require('./saida');
+const { todosOsProdutos } = require('./mineracao');
+const { ncmCurto } = require('./indicadores');
 const { cruzar, lerSourcingMd } = require('./sourcing');
 
 const ID_DE_MINERACAO = /^\d{8}-\d{6}-MLB\d{1,12}$/;
@@ -132,12 +134,17 @@ function detalharPacote(id) {
   const l = ligar(pacotes, lerResultados()).get(id);
   if (!l) throw new ToolError(`O Accio Work ainda nao gravou resultado de sourcing para o pacote ${id}.`);
   const { par, sobraram } = cruzar(alvo.pacote.produtos, l.resultado.candidatos);
+  // A mineracao tem a versao atual do produto (NCM revista, estimativas registradas depois do envio).
+  const mineracao = lerJson(path.join(pastaMineracoes(), id, 'mineracao.json'));
+  const atuais = new Map(mineracao ? todosOsProdutos(mineracao).map((p) => [p.id, p]) : []);
   return {
     id,
     arquivo: l.resultado.arquivo,
     pasta_do_resultado: path.dirname(l.resultado.arquivo),
-    linhas: alvo.pacote.produtos.map((p) => {
+    linhas: alvo.pacote.produtos.map((doPacote) => {
+      const p = atuais.get(doPacote.id) || doPacote;
       const achado = par.get(p.id);
+      const est = p.estimativa_externa;
       return {
         produto: {
           id: p.id,
@@ -145,6 +152,10 @@ function detalharPacote(id) {
           foto: p.foto,
           link: p.link,
           menor_preco: p.anuncios && p.anuncios.menor_preco ? p.anuncios.menor_preco.valor : undefined,
+          categoria: p.categoria,
+          posicao: p.melhor_posicao,
+          ncm: p.ncm ? ncmCurto(p) : undefined,
+          vendas_estimadas: est ? est.vendas : undefined,
         },
         candidato: achado ? achado.candidato : null,
         cruzamento: achado ? (achado.exato ? 'codigo' : 'semelhanca') : null,

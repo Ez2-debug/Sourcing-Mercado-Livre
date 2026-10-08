@@ -109,6 +109,26 @@ function gravarShopee(resposta, agora) {
   return { arquivo, itens: itens.length, sem_marca: itens.filter((x) => !x.tem_marca).length };
 }
 
+// Itens da Shopee buscados pelo nome dos produtos ja cotados. Nao sao o
+// ranking: servem so para achar o "produto parecido" no razao composto.
+function gravarRelacionados(resposta, agora) {
+  const itens = itensDaResposta(resposta);
+  if (!itens.length) throw new ToolError('A resposta do JoomPulse veio sem itens.');
+  fs.mkdirSync(pastaShopee(), { recursive: true });
+  const arquivo = path.join(pastaShopee(), 'relacionados.json');
+  fs.writeFileSync(arquivo, JSON.stringify({ consultado_em: (agora || new Date()).toISOString(), itens }, null, 2), 'utf8');
+  return { arquivo, itens: itens.length };
+}
+
+function lerRelacionados() {
+  try {
+    const r = JSON.parse(fs.readFileSync(path.join(pastaShopee(), 'relacionados.json'), 'utf8'));
+    return Array.isArray(r.itens) ? r.itens : [];
+  } catch (_) {
+    return [];
+  }
+}
+
 // A leitura mais recente, ou null quando ainda nao ha nenhuma.
 function lerShopee() {
   let nomes;
@@ -119,10 +139,10 @@ function lerShopee() {
   }
   if (!nomes.length) return null;
   try {
-    return JSON.parse(fs.readFileSync(path.join(pastaShopee(), nomes[nomes.length - 1]), 'utf8'));
+    return { ...JSON.parse(fs.readFileSync(path.join(pastaShopee(), nomes[nomes.length - 1]), 'utf8')), relacionados: lerRelacionados() };
   } catch (_) {
     return null;
   }
 }
 
-module.exports = { AVISO, consultaShopee, gravarShopee, itensDaResposta, lerShopee, pastaShopee };
+module.exports = { AVISO, consultaShopee, gravarRelacionados, gravarShopee, itensDaResposta, lerShopee, pastaShopee };

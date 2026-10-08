@@ -8,6 +8,7 @@
  *   node scripts/claude.js concluir <id> <situacao> <texto>  situacao: concluido | falhou
  *   node scripts/claude.js shopee-consulta                 a consulta para query_cubejs_shopee
  *   node scripts/claude.js shopee-gravar <arquivo.json>    grava a resposta do JoomPulse
+ *   node scripts/claude.js shopee-relacionados <arquivo>   itens da Shopee buscados pelo nome dos produtos cotados
  *   node scripts/claude.js joompro-consulta                a consulta para query_cubejs_joompro
  *   node scripts/claude.js joompro-gravar <arquivo.json>   grava a resposta do JoomPulse
  *   node scripts/claude.js cotacao <id do pacote>          gera as duas planilhas da cotacao
@@ -37,6 +38,10 @@ async function main() {
   if (comando === 'cotacao') {
     const planilhas = await servidor('cotacao').planilhasDaCotacao(servidor('saida').carregarMineracao(resto[0]));
     return { ...planilhas, supabase: await servidor('supabase').sincronizarRetratos() };
+  }
+  if (comando === 'shopee-relacionados') {
+    const gravado = servidor('shopee').gravarRelacionados(fs.readFileSync(resto[0], 'utf8'));
+    return { ...gravado, supabase: await servidor('supabase').sincronizarRetratos() };
   }
   if (comando === 'joompro-consulta') {
     return JSON.parse(servidor('joompro').consultaJoompro());
