@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Activity, ArrowDownRight, ArrowUpRight, BookOpenText, Bot, CheckCircle2, CircleAlert, ClipboardList, Download, FileSpreadsheet,
-  Factory, LayoutDashboard, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
+  Factory, Globe, LayoutDashboard, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
 } from 'lucide-react';
 import {
   COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarIntegracoes, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
@@ -343,6 +343,54 @@ function MercadoLivre() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Mercado Livre: Compra Internacional                                 */
+/* ------------------------------------------------------------------ */
+
+const ORIGENS = {
+  china: ['China', 'Anúncios de Compra Internacional com endereço de vendedor na China.'],
+  estados_unidos: ['Estados Unidos', 'Anúncios de Compra Internacional enviados dos Estados Unidos, inclusive pelo centro de distribuição do Mercado Livre no Texas.'],
+};
+
+function Internacional({ origem }) {
+  const { dados: d, erro, carregando } = useDados(carregarProdutos, 60000);
+  const [rotulo, explicacao] = ORIGENS[origem];
+  const itens = d ? d.itens.filter((p) => p.internacional && p.internacional[origem]) : [];
+  return (
+    <Card>
+      <CardTitulo
+        titulo={`Compra Internacional · ${rotulo}`}
+        descricao={`${explicacao} A origem é de onde o produto é enviado, não a nacionalidade do vendedor. Só entram produtos do ranking minerado que têm ao menos um anúncio internacional.`}
+      />
+      <Estado erro={erro} carregando={carregando} dados={d} />
+      {d && (
+        <Tabela
+          colunas={[{ titulo: 'Produto' }, { titulo: 'Posição', num: true }, { titulo: `Menor preço · ${rotulo}`, num: true }, { titulo: 'Menor preço no Brasil', num: true }, { titulo: 'Anúncios internacionais', num: true }, { titulo: 'Triagem' }, { titulo: 'NCM sugerida' }]}
+          vazio={!itens.length && `Nenhum produto minerado nas últimas leituras tem anúncio internacional com envio de ${rotulo}.`}
+        >
+          {itens.map((p) => {
+            const g = p.internacional[origem];
+            return (
+              <tr key={`${p.mineracao_id}-${p.id}`}>
+                <td className="min-w-64"><div className="flex items-center gap-3"><Foto src={p.foto} /><div className="min-w-0"><div className="break-words"><Nome nome={p.nome} link={p.link} /></div><div className="text-xs text-muted-foreground">{p.categoria}</div></div></div></td>
+                <td className="text-right tabular-nums">{p.posicao}º</td>
+                <td className="text-right whitespace-nowrap tabular-nums">{linkSeguro(g.link) ? <a className="underline-offset-2 hover:text-primary hover:underline" href={g.link} target="_blank" rel="noopener noreferrer">{reais(g.menor_preco)}</a> : reais(g.menor_preco)}</td>
+                <td className="text-right whitespace-nowrap tabular-nums">{reais(p.menor_preco_nacional)}</td>
+                <td className="text-right tabular-nums">{g.anuncios}</td>
+                <td><Selo tom={(SITUACOES[p.situacao] || ['neutro'])[0]}>{(SITUACOES[p.situacao] || [null, p.situacao])[1]}</Selo></td>
+                <td className="whitespace-nowrap">{p.ncm || ''}</td>
+              </tr>
+            );
+          })}
+        </Tabela>
+      )}
+    </Card>
+  );
+}
+
+const InternacionalChina = () => <Internacional origem="china" />;
+const InternacionalEua = () => <Internacional origem="estados_unidos" />;
+
+/* ------------------------------------------------------------------ */
 /* Shopee                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -673,6 +721,8 @@ const TODAS_AS_TELAS = [
   ['painel', 'Painel', LayoutDashboard, Painel, 'Mineração ao vivo e resumo do dia'],
   ['alta', 'Em alta', TrendingUp, EmAlta, 'Produtos aptos que subiram no ranking do Mercado Livre'],
   ['ml', 'Mercado Livre', Store, MercadoLivre, 'Produtos minerados pela API oficial'],
+  ['ml-china', 'ML Internacional · China', Globe, InternacionalChina, 'Mercado Livre, Compra Internacional com envio da China'],
+  ['ml-eua', 'ML Internacional · EUA', Globe, InternacionalEua, 'Mercado Livre, Compra Internacional com envio dos Estados Unidos'],
   ['shopee', 'Shopee', ShoppingBag, Shopee, 'Mais vendidos da Shopee Brasil, pelo JoomPulse'],
   ['alibaba', 'Alibaba', Factory, Alibaba, 'Fornecedores cotados para os produtos do Mercado Livre'],
   ['cotacoes', 'Cotações', FileSpreadsheet, Cotacoes, 'Pacotes enviados ao Accio Work e comparação lado a lado'],

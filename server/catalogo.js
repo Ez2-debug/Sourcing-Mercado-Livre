@@ -138,6 +138,53 @@ function listingsOf(data) {
 
 // Resumo dos anuncios de um produto de catalogo. A API devolve ate 100 por
 // pagina; `total` vem de paging e os demais numeros sao da pagina lida.
+/*
+ * Compra Internacional (anuncios de vendedores de fora do Brasil).
+ *
+ * A API marca esses anuncios com a tag "cbt_item". O pais nao vem em um campo
+ * proprio: "cbt_fulfillment_us" diz que o envio sai do centro de distribuicao
+ * do Mercado Livre nos Estados Unidos, e o endereco do vendedor traz so nomes
+ * de cidade e estado. A origem aqui e, portanto, de onde o produto e enviado,
+ * e nao a nacionalidade do vendedor: ha vendedor chines que envia pelos EUA.
+ */
+const ESTADOS_DOS_EUA = new Set(['alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado', 'connecticut', 'delaware', 'florida', 'georgia',
+  'hawaii', 'idaho', 'illinois', 'indiana', 'iowa', 'kansas', 'kentucky', 'louisiana', 'maine', 'maryland', 'massachusetts', 'michigan', 'minnesota',
+  'mississippi', 'missouri', 'montana', 'nebraska', 'nevada', 'new hampshire', 'new jersey', 'new mexico', 'new york', 'north carolina', 'north dakota',
+  'ohio', 'oklahoma', 'oregon', 'pennsylvania', 'rhode island', 'south carolina', 'south dakota', 'tennessee', 'texas', 'utah', 'vermont', 'virginia',
+  'washington', 'west virginia', 'wisconsin', 'wyoming']);
+const LUGARES_DA_CHINA = /\b(china|guangdong|shenzhen|guangzhou|dongguan|foshan|zhejiang|hangzhou|yiwu|ningbo|wenzhou|jiangsu|suzhou|nanjing|shanghai|beijing|fujian|xiamen|quanzhou|shandong|qingdao|hebei|henan|hubei|wuhan|hunan|sichuan|chengdu|chongqing|anhui|jiangxi|tianjin|hong kong|hongkong)\b/;
+
+// 'estados_unidos', 'china', 'outra' ou null quando o anuncio nao e internacional.
+function origemInternacional(it) {
+  const tags = Array.isArray(it.tags) ? it.tags : [];
+  const modo = it.international_delivery_mode;
+  if (!tags.includes('cbt_item') && !(modo && modo !== 'none')) return null;
+  if (tags.includes('cbt_fulfillment_us')) return 'estados_unidos';
+  const e = it.seller_address || {};
+  const estado = String((e.state && e.state.name) || '').trim().toLowerCase();
+  const lugar = `${estado} ${String((e.city && e.city.name) || '').toLowerCase()}`;
+  if (ESTADOS_DOS_EUA.has(estado)) return 'estados_unidos';
+  if (LUGARES_DA_CHINA.test(lugar)) return 'china';
+  return 'outra';
+}
+
+function resumoInternacional(list) {
+  const grupos = {};
+  for (const it of list) {
+    const origem = origemInternacional(it);
+    if (!origem) continue;
+    const g = grupos[origem] || (grupos[origem] = { anuncios: 0 });
+    g.anuncios += 1;
+    if (typeof it.price === 'number' && it.price > 0 && (g.menor_preco === undefined || it.price < g.menor_preco)) {
+      const itemId = it.item_id || it.id;
+      g.menor_preco = it.price;
+      Object.assign(g, itemId ? publicLink(itemId, 'ITEM', it.permalink) : {});
+    }
+  }
+  const total = Object.values(grupos).reduce((t, g) => t + g.anuncios, 0);
+  return total ? { anuncios: total, ...grupos } : null;
+}
+
 function summarizeListings(data) {
   const list = listingsOf(data);
   const total = data && data.paging && Number.isFinite(data.paging.total) ? data.paging.total : list.length;
@@ -158,6 +205,13 @@ function summarizeListings(data) {
   out.vendedores = new Set(list.map((it) => it.seller_id).filter(Boolean)).size;
   out.lojas_oficiais = list.filter((it) => it.official_store_id).length;
   out.no_full = list.filter((it) => it.shipping && it.shipping.logistic_type === 'fulfillment').length;
+  const internacional = resumoInternacional(list);
+  if (internacional) {
+    out.internacional = internacional;
+    // O menor preco entre os anuncios do Brasil, para comparar com o internacional.
+    const nacionais = priced.filter((it) => !origemInternacional(it));
+    if (nacionais.length) out.menor_preco_nacional = Math.min(...nacionais.map((it) => it.price));
+  }
   return out;
 }
 
@@ -168,6 +222,7 @@ module.exports = {
   dropEmpty,
   findSalesFields,
   listingsOf,
+  origemInternacional,
   pathForProduct,
   photosOf,
   productId,

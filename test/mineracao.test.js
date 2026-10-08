@@ -561,3 +561,23 @@ test('a fila de pedidos valida o tipo, nao repete pendente e registra o resultad
   assert.equal(pedidos.concluirPedido(a.id, 'concluido', 'planilhas geradas').situacao, 'concluido');
   assert.equal(pedidos.lerPedidos().filter((p) => p.situacao === 'pendente').length, 0);
 });
+
+test('separa os anuncios de Compra Internacional por origem do envio', () => {
+  const { origemInternacional, summarizeListings } = require('../server/catalogo');
+  const anuncio = (preco, tags, estado, cidade) => ({ item_id: `MLB${Math.round(preco * 100)}`, price: preco, tags, seller_address: { state: { name: estado }, city: { name: cidade } } });
+  const eua = anuncio(80, ['cbt_item', 'cbt_fulfillment_us'], 'Texas', 'China Grove');
+  const china = anuncio(60, ['cbt_item'], 'Guangdong', 'Shenzhen');
+  const outro = anuncio(70, ['cbt_item'], '', '');
+  const brasil = anuncio(99, ['kvs_primary'], 'São Paulo', 'São Paulo');
+  // "China Grove, Texas" e o centro de distribuicao nos EUA, nao a China.
+  assert.equal(origemInternacional(eua), 'estados_unidos');
+  assert.equal(origemInternacional(china), 'china');
+  assert.equal(origemInternacional(outro), 'outra');
+  assert.equal(origemInternacional(brasil), null);
+  const r = summarizeListings({ results: [eua, china, outro, brasil, anuncio(120, [], 'Paraná', 'Curitiba')] });
+  assert.equal(r.internacional.anuncios, 3);
+  assert.equal(r.internacional.china.menor_preco, 60);
+  assert.equal(r.internacional.estados_unidos.anuncios, 1);
+  assert.equal(r.menor_preco_nacional, 99);
+  assert.equal(summarizeListings({ results: [brasil] }).internacional, undefined);
+});

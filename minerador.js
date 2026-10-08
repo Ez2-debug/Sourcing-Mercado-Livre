@@ -288,6 +288,8 @@ function produtosDoDia() {
         vendas_estimadas: est ? est.vendas : undefined,
         avaliacoes: est ? est.avaliacoes : undefined,
         nota: est ? est.avaliacao : undefined,
+        internacional: p.anuncios ? p.anuncios.internacional : undefined,
+        menor_preco_nacional: p.anuncios ? p.anuncios.menor_preco_nacional : undefined,
         fonte_da_estimativa: est ? `${est.fonte}, por ${est.periodo === 'mensal' ? 'mês' : 'semana'}` : undefined,
         mineracao_id: m.id,
       });

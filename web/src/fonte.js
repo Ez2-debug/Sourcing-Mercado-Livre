@@ -156,7 +156,7 @@ async function produtosDoSupabase() {
   const ids = mineracoes.filter((m) => !vistas.has(m.categoria_id) && vistas.add(m.categoria_id)).map((m) => m.id);
   if (!ids.length) return { total: 0, itens: [] };
   const linhas = await todasAsLinhas(() => supabase.from('chs_produtos')
-    .select('mineracao_id, produto_id, nome, categoria, foto, link, melhor_posicao, menor_preco, situacao, prioridade, ncm_posicao, ncm_codigos, estimativa_fonte, estimativa_periodo, estimativa_vendas, avaliacoes:dados->estimativa_externa->avaliacoes, nota:dados->estimativa_externa->avaliacao')
+    .select('mineracao_id, produto_id, nome, categoria, foto, link, melhor_posicao, menor_preco, situacao, prioridade, ncm_posicao, ncm_codigos, estimativa_fonte, estimativa_periodo, estimativa_vendas, avaliacoes:dados->estimativa_externa->avaliacoes, nota:dados->estimativa_externa->avaliacao, internacional:dados->anuncios->internacional, menor_preco_nacional:dados->anuncios->menor_preco_nacional')
     .in('mineracao_id', ids).not('nome', 'is', null).order('prioridade', { ascending: false }).order('produto_id'));
   const itens = linhas.slice(0, 200).map((p) => ({
     id: p.produto_id,
@@ -172,6 +172,8 @@ async function produtosDoSupabase() {
     vendas_estimadas: p.estimativa_vendas === null ? undefined : Number(p.estimativa_vendas),
     avaliacoes: typeof p.avaliacoes === 'number' ? p.avaliacoes : undefined,
     nota: typeof p.nota === 'number' ? p.nota : undefined,
+    internacional: p.internacional || undefined,
+    menor_preco_nacional: typeof p.menor_preco_nacional === 'number' ? p.menor_preco_nacional : undefined,
     fonte_da_estimativa: p.estimativa_fonte ? `${p.estimativa_fonte}, por ${p.estimativa_periodo === 'mensal' ? 'mês' : 'semana'}` : undefined,
     mineracao_id: p.mineracao_id,
   }));
