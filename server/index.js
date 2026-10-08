@@ -35,7 +35,7 @@ const {
   resumirMineracoes, salvarMineracao,
 } = require('./saida');
 
-const SERVER_VERSION = '0.18.0';
+const SERVER_VERSION = '0.19.0';
 const SUPPORTED_PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
 /* ------------------------------------------------------------------ */

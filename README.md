@@ -259,7 +259,7 @@ Cada produto tem um botão de cotação. Sem `CONECTA_HUB_COTACAO_URL`, o botão
 
 ### Accio
 
-A aba **Accio** lista os pacotes gravados na pasta do Accio Work e mostra quais já têm resultado de sourcing. **Copiar pedido** copia o texto para colar na conversa do Accio; **Ver resultado** mostra cada produto do Mercado Livre ao lado do candidato do Alibaba; **Gerar planilha** grava a planilha do sourcing.
+A aba **Accio** lista os pacotes gravados na pasta do Accio Work e mostra quais já têm resultado de sourcing. **Copiar pedido** copia o texto para colar na conversa do Accio; **Ver resultado** mostra cada produto do Mercado Livre ao lado do candidato do Alibaba; **Gerar planilhas** grava a cotação em dois arquivos com os mesmos produtos na mesma ordem: `cotacao-<id>-mercado-livre.xlsx` (o produto como está no Mercado Livre) e `cotacao-<id>-alibaba.xlsx` (o candidato do Alibaba). A coluna `#` e o código MLB ligam as linhas de um ao outro.
 
 O Accio não informa a qual pacote um resultado pertence. A central liga o `sourcing.md` ao pacote cujos produtos ele cita pelo código; sem código, ao pacote com que a maior parte dos candidatos casa por semelhança, e avisa na tela. O sourcing em si continua sendo disparado dentro do Accio.
 

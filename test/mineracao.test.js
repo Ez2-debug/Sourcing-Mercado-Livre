@@ -523,3 +523,11 @@ test('o script da central e JavaScript valido', () => {
   const js = html.slice(html.indexOf('<script>') + 8, html.indexOf('</script>'));
   assert.doesNotThrow(() => new Function(js));
 });
+
+test('le a faixa de preco do anuncio do Alibaba em varios formatos', () => {
+  const { faixaDePreco } = require('../server/cotacao');
+  assert.deepEqual(faixaDePreco('US$ 1.20-1.80'), { min: 1.2, max: 1.8 });
+  assert.deepEqual(faixaDePreco('US$ 2,99 – 6,45'), { min: 2.99, max: 6.45 });
+  assert.deepEqual(faixaDePreco('$4.50'), { min: 4.5, max: 4.5 });
+  assert.deepEqual(faixaDePreco('sob consulta'), {});
+});

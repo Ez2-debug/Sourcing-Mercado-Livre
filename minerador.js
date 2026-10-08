@@ -32,7 +32,7 @@ const { dataLocal, mineracaoAnterior, mineracoesDoDia, pastaMineracoes } = requi
 const { centralHtml } = require('./server/central');
 const { PERIODOS, emAlta } = require('./server/emalta');
 const { detalharPacote, listarPacotes } = require('./server/accio');
-const { planilhaDoSourcing } = require('./server/sourcing');
+const { planilhasDaCotacao } = require('./server/cotacao');
 const { carregarMineracao } = require('./server/saida');
 
 const MAX_HISTORICO = 100;
@@ -244,11 +244,10 @@ function comMensagem(res, fn) {
   );
 }
 
-// Monta a planilha do sourcing de um pacote a partir do resultado ja ligado a ele.
-async function planilhaDoPacote(id) {
-  const d = detalharPacote(id);
-  const r = await planilhaDoSourcing(carregarMineracao(id), d.pasta_do_resultado);
-  return { arquivo: r.arquivo, produtos: r.produtos, candidatos: r.candidatos };
+// Monta as duas planilhas da cotacao de um pacote: Mercado Livre e Alibaba.
+function planilhaDoPacote(id) {
+  detalharPacote(id); // confere o id e se ja ha resultado antes de carregar a mineracao
+  return planilhasDaCotacao(carregarMineracao(id));
 }
 
 const COMANDOS = {

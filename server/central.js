@@ -475,9 +475,9 @@ function centralHtml() {
     botao.textContent = 'Gerando';
     fetch('/api/accio/planilha?id=' + encodeURIComponent(p.id), { method: 'POST', headers: { 'X-Conecta-Hub': '1' } })
       .then(function (r) { return r.json(); })
-      .then(function (r) { $('accio-aviso').textContent = r.erro ? r.erro : 'Planilha gravada em ' + r.arquivo; })
-      .catch(function () { $('accio-aviso').textContent = 'Não consegui gerar a planilha.'; })
-      .then(function () { botao.disabled = false; botao.textContent = 'Gerar planilha'; });
+      .then(function (r) { $('accio-aviso').textContent = r.erro ? r.erro : 'Duas planilhas gravadas: ' + r.mercado_livre + ' e ' + r.alibaba; })
+      .catch(function () { $('accio-aviso').textContent = 'Não consegui gerar as planilhas.'; })
+      .then(function () { botao.disabled = false; botao.textContent = 'Gerar planilhas'; });
   }
   function desenharAccio(a) {
     $('accio-pasta').textContent = 'Pasta dos pacotes: ' + a.pasta;
@@ -508,7 +508,7 @@ function centralHtml() {
         var ver = el('button', 'Ver resultado');
         ver.addEventListener('click', function () { verPacote(p); });
         grupo.appendChild(ver);
-        var planilha = el('button', 'Gerar planilha');
+        var planilha = el('button', 'Gerar planilhas');
         planilha.addEventListener('click', function () { gerarPlanilha(planilha, p); });
         grupo.appendChild(planilha);
       }

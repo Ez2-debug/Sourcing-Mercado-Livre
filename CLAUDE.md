@@ -27,6 +27,7 @@ A extensão instalada continua sendo a que o Claude Desktop executa; alteraçõe
 - `server/automacao.js` — passos da mineracao usados tanto pelo servidor MCP quanto pelo minerador autonomo.
 - `server/emalta.js` — produtos aptos que subiram no ranking entre duas mineracoes da mesma categoria (7 ou 30 dias).
 - `server/accio.js` — situacao dos pacotes do Accio Work para a central: liga cada `sourcing.md` ao pacote que ele responde.
+- `server/cotacao.js` — cotacao em duas planilhas com os mesmos produtos na mesma ordem: uma com os dados do Mercado Livre, outra com os candidatos do Alibaba.
 - `server/central.js` — pagina da central (dados escritos no DOM com `textContent`).
 - `scripts/inicio-automatico.ps1` — liga ou desliga o inicio do minerador com o Windows.
 - `accio-plugin/plugin.json` — plugin que registra o servidor MCP no Accio Work.
