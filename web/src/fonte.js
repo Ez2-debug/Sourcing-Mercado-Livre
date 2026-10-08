@@ -125,3 +125,29 @@ async function emAltaDoSupabase(dias) {
 export function carregarEmAlta(dias) {
   return comSupabase ? emAltaDoSupabase(dias) : local(`/api/em-alta?dias=${dias}`);
 }
+
+/* ------------------------------------------------------------------ */
+/* Backend local (minerador): integracoes, produtos, Shopee, cotacoes  */
+/* ------------------------------------------------------------------ */
+
+async function comando(caminho, corpo) {
+  const r = await fetch(caminho, {
+    method: 'POST',
+    headers: { 'X-Conecta-Hub': '1', 'Content-Type': 'application/json' },
+    body: corpo ? JSON.stringify(corpo) : undefined,
+  });
+  const dados = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(dados.erro || 'O backend recusou o pedido.');
+  return dados;
+}
+
+export const carregarEstado = () => local('/api/estado');
+export const carregarIntegracoes = () => local('/api/integracoes');
+export const carregarProdutos = () => local('/api/produtos');
+export const carregarShopee = () => local('/api/shopee');
+export const carregarPacotes = () => local('/api/accio');
+export const carregarPacote = (id) => local(`/api/accio/pacote?id=${encodeURIComponent(id)}`);
+export const carregarPedidos = () => local('/api/pedidos');
+export const criarPedido = (pedido) => comando('/api/pedidos', pedido);
+export const gerarPlanilhas = (id) => comando(`/api/accio/planilha?id=${encodeURIComponent(id)}`);
+export const comandarMinerador = (nome) => comando(`/api/${nome}`);

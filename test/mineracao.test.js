@@ -531,3 +531,33 @@ test('le a faixa de preco do anuncio do Alibaba em varios formatos', () => {
   assert.deepEqual(faixaDePreco('$4.50'), { min: 4.5, max: 4.5 });
   assert.deepEqual(faixaDePreco('sob consulta'), {});
 });
+
+test('normaliza a resposta do JoomPulse para a Shopee', () => {
+  const { itensDaResposta } = require('../server/shopee');
+  const itens = itensDaResposta({
+    columns: ['itemId', 'shopId', 'itemName', 'categoryL1Name', 'categoryName', 'hasBrand', 'brandName', 'price', 'itemImage', 'sold30Days', 'revenue30Days', 'salesTrend'],
+    data: [
+      [11, 22, 'Canudo De Silicone', 'Casa e Decoração', 'Canudos', null, null, 5.52, 'sg-111-abc', 40000, 220799.99, 13566.67],
+      [33, 44, 'Sabao Liquido', 'Casa e Decoração', 'Detergentes', true, 'OMO', 94.9, 'http://x/y.jpg', 100, 9490, -50],
+    ],
+  });
+  assert.equal(itens.length, 2);
+  assert.equal(itens[0].link, 'https://shopee.com.br/product/22/11');
+  assert.equal(itens[0].foto, 'https://down-br.img.susercontent.com/file/sg-111-abc');
+  assert.equal(itens[0].tem_marca, false);
+  assert.equal(itens[0].tendencia, 'subindo');
+  assert.equal(itens[0].faturamento_30_dias, 220800);
+  assert.equal(itens[1].foto, undefined, 'so aceita o identificador de imagem, nunca um endereco pronto');
+  assert.equal(itens[1].tendencia, 'caindo');
+});
+
+test('a fila de pedidos valida o tipo, nao repete pendente e registra o resultado', () => {
+  const pedidos = require('../server/pedidos');
+  assert.throws(() => pedidos.criarPedido({ tipo: 'apagar-tudo' }), /tipo de pedido invalido/);
+  assert.throws(() => pedidos.criarPedido({ tipo: 'cotacao', alvo: '../fora' }), /id do pacote/);
+  const a = pedidos.criarPedido({ tipo: 'cotacao', alvo: '20260101-100000-MLB1' });
+  const b = pedidos.criarPedido({ tipo: 'cotacao', alvo: '20260101-100000-MLB1' });
+  assert.equal(a.id, b.id);
+  assert.equal(pedidos.concluirPedido(a.id, 'concluido', 'planilhas geradas').situacao, 'concluido');
+  assert.equal(pedidos.lerPedidos().filter((p) => p.situacao === 'pendente').length, 0);
+});

@@ -28,13 +28,16 @@ A extensão instalada continua sendo a que o Claude Desktop executa; alteraçõe
 - `server/emalta.js` — produtos aptos que subiram no ranking entre duas mineracoes da mesma categoria (7 ou 30 dias).
 - `server/accio.js` — situacao dos pacotes do Accio Work para a central: liga cada `sourcing.md` ao pacote que ele responde.
 - `server/cotacao.js` — cotacao em duas planilhas com os mesmos produtos na mesma ordem: uma com os dados do Mercado Livre, outra com os candidatos do Alibaba.
+- `server/shopee.js` — produtos da Shopee Brasil a partir da resposta do JoomPulse (`query_cubejs_shopee`), gravados em disco.
+- `server/pedidos.js` — fila de pedidos para o Claude (cotacao no Accio, atualizacao da Shopee, estimativas, texto livre).
+- `scripts/claude.js` — atalhos de linha de comando para o Claude atender a fila, gravar a Shopee e gerar as planilhas da cotacao.
 - `server/central.js` — pagina da central (dados escritos no DOM com `textContent`).
 - `scripts/inicio-automatico.ps1` — liga ou desliga o inicio do minerador com o Windows.
 - `accio-plugin/plugin.json` — plugin que registra o servidor MCP no Accio Work.
 - `server/fila.js` — fila de categorias da mineração automática; `minerar_proxima` pega a que está há mais tempo parada.
 - `server/planilha.js` e `server/xlsx.js` — exportação para Excel com fotos; `xlsx.js` monta o arquivo (ZIP e XML) sem bibliotecas.
 - `server/supabase.js` e `supabase/schema.sql` — gravação das minerações no Supabase pela API REST, e as tabelas.
-- `web/` — aplicativo web (React + Vite) com login pelo Supabase: telas Em alta e Visão geral. Sem Supabase configurado, lê a central local (modo demonstração). `web/src/emalta.js` repete a regra de `server/emalta.js` sobre as linhas do banco.
+- `web/` — aplicativo web (React + Vite + Tailwind, componentes no estilo shadcn/ui em `web/src/ui.jsx`, tema em `web/src/estilos.css`). O minerador serve `web/dist` na raiz e a central antiga em `/central`. Telas: Painel, Em alta, Mercado Livre, Shopee, Cotações, Pedidos ao Claude e Integrações. Sem Supabase configurado, lê a central local (modo demonstração). `web/src/emalta.js` repete a regra de `server/emalta.js` sobre as linhas do banco.
 - `supabase/politicas-web.sql` — leitura das tabelas só para usuário logado.
 - `test/` — testes com `node:test` contra uma API simulada.
 
@@ -52,6 +55,7 @@ O servidor MCP e o minerador não têm dependências externas: só módulos do N
 - Não fazer engenharia reversa de serviços de terceiros (JoomPulse, Mercado Livre) para obter dados fora dos canais oficiais; usar o conector ou a API que o serviço oferece.
 - A central do minerador só atende em `127.0.0.1`, confere o cabeçalho `Host` e exige o cabeçalho `X-Conecta-Hub` nos comandos.
 - No `web/` só entra a chave pública do Supabase (anon/publishable). A chave secreta nunca vai para o navegador.
+- Shopee: os dados vêm só do JoomPulse; vendas e faturamento são estimativas dele e saem sempre rotuladas assim. Sem raspagem do site da Shopee.
 - `MELI_API_BASE` só aceita endereço local, para o Client Secret não sair para terceiros.
 - A versão aparece em três lugares e precisa andar junto: `manifest.json`, `package.json` e `SERVER_VERSION` em `server/index.js`.
 - Comentários e mensagens das ferramentas em português sem acento, como no código original.

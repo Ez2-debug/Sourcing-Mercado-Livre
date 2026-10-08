@@ -33,6 +33,10 @@ const { centralHtml } = require('./server/central');
 const { PERIODOS, emAlta } = require('./server/emalta');
 const { detalharPacote, listarPacotes } = require('./server/accio');
 const { planilhasDaCotacao } = require('./server/cotacao');
+const { lerShopee } = require('./server/shopee');
+const { TIPOS, criarPedido, lerPedidos } = require('./server/pedidos');
+const { todosOsProdutos } = require('./server/mineracao');
+const { ncmCurto, situacao: situacaoDoProduto } = require('./server/indicadores');
 const { carregarMineracao } = require('./server/saida');
 
 const MAX_HISTORICO = 100;
@@ -184,6 +188,7 @@ async function ciclo() {
     });
     estado.problema = null;
     resumoDeHoje = null;
+    produtosDeHoje = null;
     altaGuardada.clear();
     hoje().planilha = r.planilha && r.planilha.arquivo ? r.planilha.arquivo : null;
     registrar({
@@ -250,6 +255,123 @@ function planilhaDoPacote(id) {
   return planilhasDaCotacao(carregarMineracao(id));
 }
 
+/* ------------------------------------------------------------------ */
+/* Dados para o aplicativo web                                         */
+/* ------------------------------------------------------------------ */
+
+let produtosDeHoje = null;
+
+// Produtos com detalhe das mineracoes do dia, do mais prioritario para o menos.
+function produtosDoDia() {
+  const data = dataLocal(new Date().toISOString());
+  if (produtosDeHoje && produtosDeHoje.data === data) return produtosDeHoje;
+  const itens = [];
+  for (const m of mineracoesDoDia(data)) {
+    for (const p of todosOsProdutos(m)) {
+      if (!p.nome) continue;
+      const est = p.estimativa_externa;
+      itens.push({
+        id: p.id,
+        nome: p.nome,
+        categoria: p.categoria,
+        foto: p.foto,
+        link: p.link,
+        posicao: p.melhor_posicao,
+        menor_preco: p.anuncios && p.anuncios.menor_preco ? p.anuncios.menor_preco.valor : undefined,
+        situacao: situacaoDoProduto(p),
+        prioridade: p.prioridade.pontos,
+        ncm: ncmCurto(p),
+        vendas_estimadas: est ? est.vendas : undefined,
+        avaliacoes: est ? est.avaliacoes : undefined,
+        nota: est ? est.avaliacao : undefined,
+        fonte_da_estimativa: est ? `${est.fonte}, por ${est.periodo === 'mensal' ? 'mês' : 'semana'}` : undefined,
+        mineracao_id: m.id,
+      });
+    }
+  }
+  itens.sort((a, b) => b.prioridade - a.prioridade || a.posicao - b.posicao);
+  produtosDeHoje = { data, total: itens.length, itens: itens.slice(0, 200) };
+  return produtosDeHoje;
+}
+
+// Situacao de cada integracao, para a tela Integracoes.
+function integracoes() {
+  const pacotes = listarPacotes().pacotes;
+  const cotados = pacotes.filter((p) => p.sourcing);
+  const shopee = lerShopee();
+  const pedidos = lerPedidos();
+  const ultima = estado.historico.find((h) => !h.erro);
+  return [
+    {
+      id: 'mercado-livre', nome: 'Mercado Livre', via: 'API oficial, direto pelo minerador',
+      ok: credentialsConfigured() && !estado.problema,
+      detalhe: !credentialsConfigured() ? 'Client Secret não configurado.' : (estado.problema || (ultima ? `Última mineração: ${ultima.categoria}.` : 'Aguardando a primeira mineração.')),
+      atualizado_em: ultima ? ultima.fim : null,
+    },
+    {
+      id: 'shopee', nome: 'Shopee', via: 'JoomPulse, buscado pelo Claude',
+      ok: Boolean(shopee),
+      detalhe: shopee ? `${shopee.itens.length} produtos na última leitura. Vendas são estimativas do JoomPulse.` : 'Ainda sem leitura. Peça a atualização ao Claude.',
+      atualizado_em: shopee ? shopee.consultado_em : null,
+    },
+    {
+      id: 'accio', nome: 'Accio Work', via: 'Pasta de pacotes neste computador',
+      ok: pacotes.length > 0,
+      detalhe: `${pacotes.length} pacotes gravados, ${pacotes.length - cotados.length} aguardando cotação.`,
+      atualizado_em: pacotes.length ? pacotes[0].minerado_em : null,
+    },
+    {
+      id: 'alibaba', nome: 'Alibaba', via: 'Cotações feitas pelo Accio Work',
+      ok: cotados.length > 0,
+      detalhe: cotados.length ? `${cotados.length} pacote(s) cotado(s). Preço de anúncio, não cotação FOB.` : 'Nenhum pacote cotado ainda.',
+      atualizado_em: cotados.length ? cotados[0].sourcing.feito_em : null,
+    },
+    {
+      id: 'claude', nome: 'Claude', via: 'Fila de pedidos lida pelo Claude Code',
+      ok: true,
+      detalhe: `${pedidos.filter((p) => p.situacao === 'pendente').length} pedido(s) pendente(s). O Claude executa quando está aberto e você pede.`,
+      atualizado_em: pedidos.length ? pedidos[0].criado_em : null,
+    },
+  ];
+}
+
+// Corpo JSON pequeno de um POST; recusa o que passar do limite.
+function lerCorpo(req) {
+  return new Promise((resolve, reject) => {
+    let dados = '';
+    req.setEncoding('utf8');
+    req.on('data', (parte) => {
+      dados += parte;
+      if (dados.length > 8192) { reject(new ToolError('Pedido grande demais.')); req.destroy(); }
+    });
+    req.on('end', () => {
+      try { resolve(dados ? JSON.parse(dados) : {}); } catch (_) { reject(new ToolError('O corpo do pedido nao e JSON valido.')); }
+    });
+    req.on('error', reject);
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Aplicativo web compilado (web/dist)                                 */
+/* ------------------------------------------------------------------ */
+
+const PASTA_DO_APP = path.join(__dirname, 'web', 'dist');
+const TIPOS_DE_ARQUIVO = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
+
+// Devolve o arquivo do aplicativo, ou null se nao existir ou sair da pasta.
+function arquivoDoApp(caminho) {
+  const relativo = caminho === '/' ? 'index.html' : caminho.replace(/^\/+/, '');
+  const alvo = path.resolve(PASTA_DO_APP, relativo);
+  if (alvo !== PASTA_DO_APP && !alvo.startsWith(PASTA_DO_APP + path.sep)) return null;
+  const tipo = TIPOS_DE_ARQUIVO[path.extname(alvo).toLowerCase()];
+  if (!tipo) return null;
+  try {
+    return { tipo, dados: fs.readFileSync(alvo) };
+  } catch (_) {
+    return null;
+  }
+}
+
 const COMANDOS = {
   pausar() {
     estado.pausado = true;
@@ -275,6 +397,9 @@ function atender(req, res) {
   if (req.method === 'POST' && caminho === '/api/accio/planilha' && req.headers['x-conecta-hub'] === '1') {
     return comMensagem(res, () => planilhaDoPacote(pedido.searchParams.get('id')));
   }
+  if (req.method === 'POST' && caminho === '/api/pedidos' && req.headers['x-conecta-hub'] === '1') {
+    return comMensagem(res, async () => criarPedido(await lerCorpo(req)));
+  }
   if (req.method === 'POST') {
     const comando = caminho.startsWith('/api/') ? COMANDOS[caminho.slice(5)] : null;
     // O cabecalho proprio impede que um formulario de outro site dispare o comando.
@@ -284,7 +409,17 @@ function atender(req, res) {
   }
   if (req.method !== 'GET') return responder(res, 405, 'text/plain; charset=utf-8', 'Metodo nao aceito.');
 
-  if (caminho === '/') return responder(res, 200, 'text/html; charset=utf-8', centralHtml());
+  // O aplicativo web compilado fica na raiz; a central antiga continua em /central.
+  if (caminho === '/central') return responder(res, 200, 'text/html; charset=utf-8', centralHtml());
+  if (!caminho.startsWith('/api/') && !caminho.startsWith('/mineracao/')) {
+    const app = arquivoDoApp(caminho);
+    if (app) return responder(res, 200, app.tipo, app.dados);
+    if (caminho === '/') return responder(res, 200, 'text/html; charset=utf-8', centralHtml());
+  }
+  if (caminho === '/api/integracoes') return json(res, 200, integracoes());
+  if (caminho === '/api/produtos') return json(res, 200, produtosDoDia());
+  if (caminho === '/api/shopee') return json(res, 200, lerShopee() || { itens: [], consultado_em: null });
+  if (caminho === '/api/pedidos') return json(res, 200, { tipos: TIPOS, pedidos: lerPedidos().slice(0, 50) });
   if (caminho === '/api/estado') return responder(res, 200, 'application/json; charset=utf-8', JSON.stringify(retrato()));
   if (caminho === '/api/accio') return json(res, 200, listarPacotes());
   if (caminho === '/api/accio/pacote') return comMensagem(res, () => detalharPacote(pedido.searchParams.get('id')));

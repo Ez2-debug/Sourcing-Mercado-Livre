@@ -212,7 +212,31 @@ A extensão instalada no Claude Desktop é uma cópia. Para ela usar o código d
 npx @anthropic-ai/mcpb pack
 ```
 
-## Aplicativo web
+## Aplicativo web e backend
+
+O minerador é também o backend: serve a interface compilada (`web/dist`) em `http://127.0.0.1:4310` e as rotas de dados em `/api`. A central antiga continua em `/central`.
+
+```bash
+cd web
+npm install
+npm run build
+```
+
+| Integração | Como chega | Rota |
+|---|---|---|
+| Mercado Livre | API oficial, direto pelo minerador | `/api/estado`, `/api/produtos`, `/api/em-alta` |
+| Shopee | JoomPulse (`query_cubejs_shopee`), buscado pelo Claude e gravado por `scripts/claude.js shopee-gravar` | `/api/shopee` |
+| Accio Work | Pasta de pacotes neste computador | `/api/accio` |
+| Alibaba | Cotações que o Accio grava em `sourcing.md` | `/api/accio/pacote`, `/api/accio/planilha` |
+| Claude | Fila de pedidos que o Claude Code lê e executa | `/api/pedidos` |
+
+A Shopee e o Accio não têm caminho direto a partir do backend: o JoomPulse só existe como conector do Claude, e o Accio só é operado pela tela. Por isso a interface grava **pedidos** e o Claude os atende quando está aberto (`node scripts/claude.js pedidos` lista os pendentes).
+
+Vendas e faturamento da Shopee são estimativas do JoomPulse a partir do contador público arredondado da Shopee; não são vendas reais.
+
+A interface usa Tailwind com componentes no estilo do shadcn/ui e um tema em variáveis CSS (`web/src/estilos.css`), que pode ser trocado por um gerado no tweakcn.
+
+### Supabase (opcional)
 
 A pasta `web/` é a versão do produto com cara de serviço: login, **Em alta** e **Visão geral**, lendo as minerações do Supabase.
 
