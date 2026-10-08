@@ -32,7 +32,7 @@ const COLUNAS_ML = [
 ];
 
 const COLUNAS_ALIBABA = [
-  ['#', 5], ['Foto', 14], ['Código', 15], ['Produto no Mercado Livre', 46], ['Anúncio no Alibaba', 52], ['Fornecedor', 34],
+  ['#', 5], ['Foto', 14], ['Código', 15], ['Produto no Mercado Livre', 46], ['NCM sugerida', 16], ['Descrição oficial da NCM', 44], ['Anúncio no Alibaba', 52], ['Fornecedor', 34],
   ['Preço do anúncio (US$)', 16], ['Preço mínimo (US$)', 12], ['Preço máximo (US$)', 12], ['MOQ do anúncio', 16], ['Local', 22],
   ['Aderência (Accio)', 11], ['Cruzamento', 18], ['Observação do Accio', 60], ['Link do anúncio', 46],
 ];
@@ -94,6 +94,13 @@ function linhaMl(p, i) {
   };
 }
 
+// Descricao oficial do codigo sugerido ou, sem codigo de 8 digitos, da posicao.
+function descricaoDaNcm(p) {
+  if (!p.ncm) return '';
+  const alvo = p.ncm.sugestoes.length ? p.ncm.sugestoes[0] : p.ncm.posicao[0];
+  return (alvo && alvo.descricao) || '';
+}
+
 function linhaAlibaba(p, achado, i) {
   const c = achado.candidato || {};
   const faixa = faixaDePreco(c.preco);
@@ -106,6 +113,8 @@ function linhaAlibaba(p, achado, i) {
       { v: '', s: t },
       { v: p.id, s: t },
       { v: p.nome, s: t },
+      { v: ncmCurto(p) || '', s: t },
+      { v: descricaoDaNcm(p), s: t },
       { v: c.titulo || 'Sem candidato', s: c.link ? ESTILO.link : ESTILO.marca, link: c.link },
       { v: c.fornecedor || '', s: t },
       { v: c.preco || '', s: t },
@@ -167,6 +176,7 @@ async function planilhasDaCotacao(m, baixar) {
       ['Par desta planilha', ligacao],
       ['Origem', `${detalhe.arquivo}`],
       ['Preço do anúncio', 'Faixa publicada no anúncio do Alibaba, em dólares. Não é cotação FOB: frete, impostos e condições só saem com pedido de cotação ao fornecedor. Mínimo e máximo são lidos do texto do anúncio.'],
+      ['NCM sugerida', 'Sugerida a partir da descrição do produto no Mercado Livre e da tabela oficial do Siscomex; vale para o equivalente importado. É ponto de partida para o despachante, não classificação fiscal, e não traz alíquota. Vazia quando o tipo de produto não está no dicionário.'],
       ['MOQ do anúncio', 'Quantidade mínima publicada, na unidade do anúncio (peças, jogos, metros).'],
       ['Aderência', 'Nota de 0 a 100 dada pelo Accio para a semelhança entre o candidato e o produto pedido.'],
       ['Cruzamento', 'Pelo código: a linha do candidato cita o código do produto. Por semelhança: escolhido pelas palavras em comum; precisa ser conferido.'],

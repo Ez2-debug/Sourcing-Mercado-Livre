@@ -61,6 +61,14 @@ const POSICOES = [
   [/tomada|interruptor|plugue|adaptador de tomada|disjuntor/, ['8536']],
   [/carregador|fonte\b/, ['8504']],
   [/cabo\b|cabos\b|extensao eletrica|filtro de linha/, ['8544']],
+  // Antes das regras gerais de relogio e de estojo: o relogio de parede nao e
+  // relogio de pulso, a pulseira avulsa tem posicao propria, e a caneta que
+  // vem "com estojo" continua sendo caneta.
+  [/relogios? de (parede|mesa)|despertador/, ['9105']],
+  [/^(kit \d+ )?pulseiras? .*(watch|relogio|amazfit|mi band)/, ['9113']],
+  [/^(kit \d+ )?canetas?\b/, ['9608']],
+  [/porta[- ]?joias?|estojo (de|para) joias?/, ['4202']],
+  [/piercing|brincos?\b|bijuteria|\bcolar\b|gargantilha|tornozeleira/, ['7117']],
   // "celular" so conta abrindo o nome: suporte e capa "de celular" sao outra coisa.
   [/smartwatch|relogio inteligente|^(kit \d+ )?celular|smartphone|telefone|roteador|repetidor|radios? comunicador|walkie/, ['8517']],
   [/relogio/, ['9102']],
