@@ -193,6 +193,9 @@ export const carregarProdutos = () => (comSupabase ? produtosDoSupabase() : loca
 export const carregarShopee = () => (comSupabase
   ? retrato('shopee').then((r) => r || { itens: [], consultado_em: null })
   : local('/api/shopee'));
+export const carregarJoompro = () => (comSupabase
+  ? retrato('joompro').then((r) => r || { itens: [], consultado_em: null })
+  : local('/api/joompro'));
 export const carregarPacotes = () => (comSupabase
   ? retrato('cotacoes').then((r) => r || { pacotes: [] })
   : local('/api/accio'));

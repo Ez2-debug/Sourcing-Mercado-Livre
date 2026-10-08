@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Activity, ArrowDownRight, ArrowUpRight, BookOpenText, Bot, CheckCircle2, CircleAlert, ClipboardList, Download, FileSpreadsheet,
-  Factory, Globe, LayoutDashboard, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
+  Factory, Globe, LayoutDashboard, Ship, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
 } from 'lucide-react';
 import {
-  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarIntegracoes, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
+  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarIntegracoes, carregarJoompro, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
   carregarShopee, carregarVisaoGeral, comSupabase, comandarMinerador, criarPedido, gerarPlanilhas, supabase,
 } from './fonte.js';
 import { Aviso, Botao, Card, CardTitulo, Carregando, Indicador, Selo, Tabela } from './ui.jsx';
@@ -27,7 +27,7 @@ function hora(iso) {
 }
 
 // Fotos e links vem de fora: so entram na pagina os enderecos esperados.
-const CDNS = /^https:\/\/[a-z0-9.-]+\.(mlstatic\.com|susercontent\.com|alicdn\.com)\//i;
+const CDNS = /^https:\/\/[a-z0-9.-]+\.(mlstatic\.com|susercontent\.com|alicdn\.com|joomprocdn\.net)\//i;
 const fotoSegura = (u) => (typeof u === 'string' && CDNS.test(u) ? u : null);
 const linkSeguro = (u) => (typeof u === 'string' && /^https:\/\//i.test(u) ? u : null);
 
@@ -391,6 +391,59 @@ const InternacionalChina = () => <Internacional origem="china" />;
 const InternacionalEua = () => <Internacional origem="estados_unidos" />;
 
 /* ------------------------------------------------------------------ */
+/* China pelo JoomPro                                                  */
+/* ------------------------------------------------------------------ */
+
+const percentual = (v) => (typeof v === 'number' ? `${(v * 100).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%` : '');
+
+function China() {
+  const [soLotePequeno, setSoLotePequeno] = useState(false);
+  const { dados: d, erro, carregando } = useDados(carregarJoompro, 60000);
+  const itens = d ? d.itens.filter((p) => !soLotePequeno || p.lote_pequeno) : [];
+  return (
+    <Card>
+      <CardTitulo
+        titulo="Importação da China pelo JoomPro"
+        descricao={d && d.consultado_em
+          ? `Leitura de ${hora(d.consultado_em)}, do catálogo JoomPro pelo JoomPulse. Produtos que podem ser importados, com o produto do Mercado Livre mais parecido.`
+          : (comSupabase ? 'Ainda não há leitura publicada.' : 'Ainda sem leitura. Os dados vêm do JoomPulse, que só o Claude alcança: peça a atualização.')}
+        acao={<div className="flex flex-wrap items-center gap-2"><Alternador opcoes={[[false, 'Todos'], [true, 'Lote pequeno']]} valor={soLotePequeno} aoMudar={setSoLotePequeno} /><PedirAoClaude pedido={{ tipo: 'joompro' }} rotulo="Pedir atualização" /></div>}
+      />
+      <Estado erro={erro} carregando={carregando} dados={d} />
+      {d && d.itens.length > 0 && (
+        <ul className="mb-4 list-disc space-y-1 rounded-md bg-warning-soft py-2 pr-3 pl-7 text-xs text-warning">
+          <li>O par com o Mercado Livre é automático, por semelhança de foto e título. Mesmo com semelhança de 0,90 ou mais, só cerca de um par em três é de fato o mesmo produto: confira antes de usar a margem.</li>
+          <li>O custo é o custo posto no Brasil (frete, seguro e impostos incluídos) no menor preço entre as faixas de quantidade. No pedido mínimo o preço é maior.</li>
+          <li>Os pedidos do Mercado Livre são estimativa do JoomPulse. A margem não desconta comissão do marketplace nem imposto de renda.</li>
+        </ul>
+      )}
+      {d && (
+        <Tabela
+          colunas={[{ titulo: 'Produto no JoomPro' }, { titulo: 'Custo no Brasil', num: true }, { titulo: 'Pedido mínimo', num: true }, { titulo: 'Par no Mercado Livre' }, { titulo: 'Semelhança', num: true }, { titulo: 'Menor preço ML', num: true }, { titulo: 'Margem', num: true }, { titulo: 'Pedidos est./mês', num: true }]}
+          vazio={!itens.length && 'Nenhum produto nesta leitura.'}
+        >
+          {itens.map((p) => {
+            const ml = p.mercado_livre || {};
+            return (
+              <tr key={p.id}>
+                <td className="min-w-64"><div className="flex items-center gap-3"><Foto src={p.foto} /><div className="min-w-0"><div className="break-words"><Nome nome={p.titulo || 'Sem título'} link={p.link} /></div><div className="text-xs text-muted-foreground">{p.categoria}</div></div></div></td>
+                <td className="text-right whitespace-nowrap tabular-nums">{reais(p.custo_no_brasil)}</td>
+                <td className="text-right tabular-nums">{inteiro(p.pedido_minimo)}{p.lote_pequeno ? <div><Selo tom="primario">lote pequeno</Selo></div> : null}</td>
+                <td className="min-w-56 text-sm"><div className="break-words"><Nome nome={ml.titulo || ml.id || ''} link={ml.link} /></div><div className="text-xs text-muted-foreground">{ml.categoria}</div></td>
+                <td className="text-right tabular-nums">{typeof p.semelhanca === 'number' ? p.semelhanca.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}</td>
+                <td className="text-right whitespace-nowrap tabular-nums">{reais(ml.menor_preco)}</td>
+                <td className="text-right tabular-nums">{percentual(p.margem)}</td>
+                <td className="text-right tabular-nums">{inteiro(ml.pedidos_estimados_no_mes)}</td>
+              </tr>
+            );
+          })}
+        </Tabela>
+      )}
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Shopee                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -723,6 +776,7 @@ const TODAS_AS_TELAS = [
   ['ml', 'Mercado Livre', Store, MercadoLivre, 'Produtos minerados pela API oficial'],
   ['ml-china', 'ML Internacional · China', Globe, InternacionalChina, 'Mercado Livre, Compra Internacional com envio da China'],
   ['ml-eua', 'ML Internacional · EUA', Globe, InternacionalEua, 'Mercado Livre, Compra Internacional com envio dos Estados Unidos'],
+  ['china', 'China (JoomPro)', Ship, China, 'Produtos importáveis da China, com par no Mercado Livre'],
   ['shopee', 'Shopee', ShoppingBag, Shopee, 'Mais vendidos da Shopee Brasil, pelo JoomPulse'],
   ['alibaba', 'Alibaba', Factory, Alibaba, 'Fornecedores cotados para os produtos do Mercado Livre'],
   ['cotacoes', 'Cotações', FileSpreadsheet, Cotacoes, 'Pacotes enviados ao Accio Work e comparação lado a lado'],

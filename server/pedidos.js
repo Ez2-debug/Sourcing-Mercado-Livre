@@ -18,6 +18,7 @@ const { ToolError, cleanEnv } = require('./meli');
 const TIPOS = {
   cotacao: 'Cotar no Alibaba (Accio) os produtos de um pacote',
   shopee: 'Atualizar os produtos da Shopee (JoomPulse)',
+  joompro: 'Atualizar o catalogo de importacao da China (JoomPro)',
   vendas: 'Buscar estimativas de venda do dia no Mercado Livre (JoomPulse)',
   livre: 'Pedido em texto livre',
 };

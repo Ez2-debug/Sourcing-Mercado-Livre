@@ -172,6 +172,8 @@ async function sincronizarRetratos() {
     const linhas = [{ chave: 'cotacoes', atualizado_em: agora, dados: { pacotes } }];
     const shopee = lerShopee();
     if (shopee) linhas.push({ chave: 'shopee', atualizado_em: agora, dados: shopee });
+    const joompro = require('./joompro').lerJoompro();
+    if (joompro) linhas.push({ chave: 'joompro', atualizado_em: agora, dados: joompro });
     await upsert(cfg, 'chs_retratos', 'chave', linhas);
     return { projeto: new URL(cfg.url).hostname, retratos: linhas.map((l) => l.chave) };
   } catch (err) {

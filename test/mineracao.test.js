@@ -581,3 +581,22 @@ test('separa os anuncios de Compra Internacional por origem do envio', () => {
   assert.equal(r.menor_preco_nacional, 99);
   assert.equal(summarizeListings({ results: [brasil] }).internacional, undefined);
 });
+
+test('normaliza o catalogo JoomPro e so aceita enderecos dos dominios esperados', () => {
+  const { consultaJoompro, itensDaResposta } = require('../server/joompro');
+  const itens = itensDaResposta({
+    columns: ['joomproProductId', 'title', 'imageUrl', 'l1CategoryName', 'categoryName', 'joomproPriceAmount', 'minAvailableMoq', 'smallBatchAvailable', 'joomproUrl', 'score', 'productId', 'meliTitle', 'meliPriceMin', 'meliCatalogOrders1m', 'marginality', 'meliUrl'],
+    data: [
+      ['a1', 'Car vent clip', 'https://cbu01.alicdn.com/x.jpg', 'Automobiles & Motorcycles', 'Interior Mouldings', 1.72, 677, true, 'https://joom.pro/pt-br/products/a1', 0.9007, 'MLB-37', 'Friso Ar Condicionado', 25.87, 34, 0.9335, 'https://produto.mercadolivre.com.br/MLB-37'],
+      ['a2', 'Outro', 'https://evil.example/x.jpg', 'Home & Kitchen', 'X', 2, 10, false, 'https://evil.example/p', 0.95, null, null, null, null, null, null],
+    ],
+  });
+  assert.equal(itens.length, 1, 'item com link fora do JoomPro fica de fora');
+  assert.equal(itens[0].custo_no_brasil, 1.72);
+  assert.equal(itens[0].pedido_minimo, 677);
+  assert.equal(itens[0].semelhanca, 0.9007);
+  assert.equal(itens[0].mercado_livre.pedidos_estimados_no_mes, 34);
+  assert.equal(itens[0].foto, 'https://cbu01.alicdn.com/x.jpg');
+  const consulta = JSON.parse(consultaJoompro());
+  assert.deepEqual(consulta.order, [['JprProductsMeli.qualityScore', 'desc']], 'nunca ordena por margem');
+});

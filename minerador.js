@@ -34,6 +34,7 @@ const { PERIODOS, emAlta } = require('./server/emalta');
 const { detalharPacote, listarPacotes } = require('./server/accio');
 const { planilhasDaCotacao } = require('./server/cotacao');
 const { lerShopee } = require('./server/shopee');
+const { lerJoompro } = require('./server/joompro');
 const { sincronizarRetratos } = require('./server/supabase');
 const { TIPOS, criarPedido, lerPedidos } = require('./server/pedidos');
 const { todosOsProdutos } = require('./server/mineracao');
@@ -321,6 +322,12 @@ function integracoes() {
       atualizado_em: shopee ? shopee.consultado_em : null,
     },
     {
+      id: 'joompro', nome: 'China (JoomPro)', via: 'Catálogo de importação do JoomPulse, buscado pelo Claude',
+      ok: Boolean(lerJoompro()),
+      detalhe: lerJoompro() ? `${lerJoompro().itens.length} produtos importáveis com par no Mercado Livre. O par é automático e precisa ser conferido.` : 'Ainda sem leitura. Peça a atualização ao Claude.',
+      atualizado_em: lerJoompro() ? lerJoompro().consultado_em : null,
+    },
+    {
       id: 'accio', nome: 'Accio Work', via: 'Pasta de pacotes neste computador',
       ok: pacotes.length > 0,
       detalhe: `${pacotes.length} pacotes gravados, ${pacotes.length - cotados.length} aguardando cotação.`,
@@ -424,6 +431,7 @@ function atender(req, res) {
   }
   if (caminho === '/api/integracoes') return json(res, 200, integracoes());
   if (caminho === '/api/produtos') return json(res, 200, produtosDoDia());
+  if (caminho === '/api/joompro') return json(res, 200, lerJoompro() || { itens: [], consultado_em: null });
   if (caminho === '/api/shopee') return json(res, 200, lerShopee() || { itens: [], consultado_em: null });
   if (caminho === '/api/pedidos') return json(res, 200, { tipos: TIPOS, pedidos: lerPedidos().slice(0, 50) });
   if (caminho === '/api/estado') return responder(res, 200, 'application/json; charset=utf-8', JSON.stringify(retrato()));

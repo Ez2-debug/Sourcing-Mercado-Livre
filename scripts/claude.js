@@ -8,6 +8,8 @@
  *   node scripts/claude.js concluir <id> <situacao> <texto>  situacao: concluido | falhou
  *   node scripts/claude.js shopee-consulta                 a consulta para query_cubejs_shopee
  *   node scripts/claude.js shopee-gravar <arquivo.json>    grava a resposta do JoomPulse
+ *   node scripts/claude.js joompro-consulta                a consulta para query_cubejs_joompro
+ *   node scripts/claude.js joompro-gravar <arquivo.json>   grava a resposta do JoomPulse
  *   node scripts/claude.js cotacao <id do pacote>          gera as duas planilhas da cotacao
  *   node scripts/claude.js sincronizar                     envia Shopee e cotacoes ao Supabase
  */
@@ -35,6 +37,13 @@ async function main() {
   if (comando === 'cotacao') {
     const planilhas = await servidor('cotacao').planilhasDaCotacao(servidor('saida').carregarMineracao(resto[0]));
     return { ...planilhas, supabase: await servidor('supabase').sincronizarRetratos() };
+  }
+  if (comando === 'joompro-consulta') {
+    return JSON.parse(servidor('joompro').consultaJoompro());
+  }
+  if (comando === 'joompro-gravar') {
+    const gravado = servidor('joompro').gravarJoompro(fs.readFileSync(resto[0], 'utf8'));
+    return { ...gravado, supabase: await servidor('supabase').sincronizarRetratos() };
   }
   if (comando === 'sincronizar') {
     return (await servidor('supabase').sincronizarRetratos()) || { aviso: 'Supabase nao configurado: defina SUPABASE_URL e SUPABASE_KEY.' };
