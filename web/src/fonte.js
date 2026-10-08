@@ -199,3 +199,15 @@ export const carregarPedidos = () => local('/api/pedidos');
 export const criarPedido = (pedido) => comando('/api/pedidos', pedido);
 export const gerarPlanilhas = (id) => comando(`/api/accio/planilha?id=${encodeURIComponent(id)}`);
 export const comandarMinerador = (nome) => comando(`/api/${nome}`);
+
+// Todas as cotacoes ja feitas, com as linhas produto x candidato. Na versao
+// hospedada as linhas ja vem no retrato; no backend local, uma chamada por pacote.
+export async function carregarCotacoesCompletas() {
+  const { pacotes } = await carregarPacotes();
+  const cotados = pacotes.filter((p) => p.sourcing);
+  return Promise.all(cotados.map(async (p) => ({
+    id: p.id,
+    categoria: p.categoria,
+    linhas: p.linhas || (await carregarPacote(p.id)).linhas || [],
+  })));
+}

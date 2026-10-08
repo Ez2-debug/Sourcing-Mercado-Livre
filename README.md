@@ -230,6 +230,8 @@ npm run build
 | Alibaba | Cotações que o Accio grava em `sourcing.md` | `/api/accio/pacote`, `/api/accio/planilha` |
 | Claude | Fila de pedidos que o Claude Code lê e executa | `/api/pedidos` |
 
+A tela **Razão** baixa uma planilha Excel com os dados do site: **composta** (uma linha por produto cotado, com Mercado Livre, Alibaba e Shopee lado a lado, mais uma aba completa de cada marketplace) ou de **um marketplace por vez**. A Shopee entra no composto por semelhança de nome, marcada para conferência. A planilha gerada no navegador não embute fotos.
+
 A Shopee e o Accio não têm caminho direto a partir do backend: o JoomPulse só existe como conector do Claude, e o Accio só é operado pela tela. Por isso a interface grava **pedidos** e o Claude os atende quando está aberto (`node scripts/claude.js pedidos` lista os pendentes).
 
 Vendas e faturamento da Shopee são estimativas do JoomPulse a partir do contador público arredondado da Shopee; não são vendas reais.

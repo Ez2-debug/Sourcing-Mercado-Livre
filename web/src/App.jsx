@@ -1,13 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Activity, ArrowDownRight, ArrowUpRight, Bot, CheckCircle2, CircleAlert, ClipboardList, FileSpreadsheet,
+  Activity, ArrowDownRight, ArrowUpRight, BookOpenText, Bot, CheckCircle2, CircleAlert, ClipboardList, Download, FileSpreadsheet,
   LayoutDashboard, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
 } from 'lucide-react';
 import {
-  COTACAO_URL, carregarEmAlta, carregarIntegracoes, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
+  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarIntegracoes, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
   carregarShopee, carregarVisaoGeral, comSupabase, comandarMinerador, criarPedido, gerarPlanilhas, supabase,
 } from './fonte.js';
 import { Aviso, Botao, Card, CardTitulo, Carregando, Indicador, Selo, Tabela } from './ui.jsx';
+import { TIPOS_DE_RAZAO, montarRazao } from './razao.js';
+import { baixarPlanilha } from './planilha.js';
 
 /* ------------------------------------------------------------------ */
 /* Apoio                                                               */
@@ -480,6 +482,78 @@ function Cotacoes() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Razao                                                               */
+/* ------------------------------------------------------------------ */
+
+// Junta as tres fontes; uma que falhe nao impede as outras de sair na planilha.
+async function carregarTudoParaORazao() {
+  const [produtos, shopee, cotacoes] = await Promise.allSettled([carregarProdutos(), carregarShopee(), carregarCotacoesCompletas()]);
+  const falhas = [];
+  if (produtos.status === 'rejected') falhas.push('Mercado Livre');
+  if (shopee.status === 'rejected') falhas.push('Shopee');
+  if (cotacoes.status === 'rejected') falhas.push('cotações do Alibaba');
+  return {
+    produtos: produtos.status === 'fulfilled' ? produtos.value.itens : [],
+    shopee: shopee.status === 'fulfilled' ? shopee.value.itens : [],
+    cotacoes: cotacoes.status === 'fulfilled' ? cotacoes.value : [],
+    falhas,
+  };
+}
+
+function Razao() {
+  const { dados: d, erro, carregando } = useDados(carregarTudoParaORazao, 0);
+  const [tipo, setTipo] = useState('composto');
+  const [situacao, setSituacao] = useState(null);
+  const linhasDeCotacao = d ? d.cotacoes.reduce((t, c) => t + c.linhas.length, 0) : 0;
+  const quantas = d ? { composto: linhasDeCotacao, 'mercado-livre': d.produtos.length, shopee: d.shopee.length, alibaba: linhasDeCotacao } : {};
+
+  const baixar = async () => {
+    setSituacao('Gerando a planilha.');
+    try {
+      const razao = montarRazao(tipo, d);
+      await baixarPlanilha(razao);
+      setSituacao(`Planilha gerada: ${razao.arquivo} (${razao.linhas} linhas na primeira aba).`);
+    } catch (e) {
+      setSituacao(`Não consegui gerar a planilha: ${e.message}`);
+    }
+  };
+
+  return (
+    <Card>
+      <CardTitulo titulo="Tirar o razão em Excel" descricao="A planilha sai com os dados que o site tem agora, nos moldes das planilhas de cotação. Escolha o formato e baixe." />
+      <Estado erro={erro} carregando={carregando} dados={d} />
+      {d && d.falhas.length > 0 && <Aviso>Não consegui ler: {d.falhas.join(', ')}. O razão sai sem essa parte.</Aviso>}
+      {d && (
+        <>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3" role="radiogroup" aria-label="Formato do razão">
+            {TIPOS_DE_RAZAO.map(([id, rotulo, descricao]) => (
+              <button key={id} role="radio" aria-checked={tipo === id} onClick={() => setTipo(id)}
+                className={`rounded-lg border p-4 text-left transition ${tipo === id ? 'border-primary bg-accent' : 'bg-card hover:bg-muted'}`}>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{rotulo}</span>
+                  <Selo tom={quantas[id] ? 'primario' : 'neutro'} className="ml-auto">{quantas[id]} linhas</Selo>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{descricao}</p>
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Botao variante="primario" onClick={baixar} disabled={!quantas[tipo]}><Download className="size-4" />Baixar planilha (.xlsx)</Botao>
+            {!quantas[tipo] && <span className="text-sm text-muted-foreground">Ainda não há dados para este formato.</span>}
+            {situacao && <span className="text-sm break-words text-muted-foreground">{situacao}</span>}
+          </div>
+          <ul className="mt-4 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+            <li>O composto traz uma linha por produto do Mercado Livre que já foi cotado no Alibaba; a Shopee entra por semelhança de nome, para conferir.</li>
+            <li>Preço do Alibaba é o do anúncio, em dólares, sem conversão: não é cotação FOB.</li>
+            <li>A planilha baixada pelo site não embute fotos; ela traz o link de cada foto.</li>
+          </ul>
+        </>
+      )}
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Pedidos ao Claude                                                   */
 /* ------------------------------------------------------------------ */
 
@@ -554,6 +628,7 @@ const TODAS_AS_TELAS = [
   ['ml', 'Mercado Livre', Store, MercadoLivre, 'Produtos minerados pela API oficial'],
   ['shopee', 'Shopee', ShoppingBag, Shopee, 'Mais vendidos da Shopee Brasil, pelo JoomPulse'],
   ['cotacoes', 'Cotações', FileSpreadsheet, Cotacoes, 'Accio Work e Alibaba'],
+  ['razao', 'Razão', BookOpenText, Razao, 'Planilha composta ou de um marketplace por vez'],
   ['pedidos', 'Pedidos ao Claude', Bot, Pedidos, 'Fila do que só o Claude executa'],
   ['integracoes', 'Integrações', Plug, Integracoes, 'Situação de cada ligação'],
 ];
