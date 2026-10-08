@@ -236,26 +236,28 @@ Vendas e faturamento da Shopee são estimativas do JoomPulse a partir do contado
 
 A interface usa Tailwind com componentes no estilo do shadcn/ui e um tema em variáveis CSS (`web/src/estilos.css`), que pode ser trocado por um gerado no tweakcn.
 
-### Supabase (opcional)
+### Versão hospedada (GitHub Pages + Supabase)
 
-A pasta `web/` é a versão do produto com cara de serviço: login, **Em alta** e **Visão geral**, lendo as minerações do Supabase.
+A interface pode ficar na web, com login, enquanto o minerador continua neste computador e envia os dados ao Supabase. Não há servidor nem custo mensal, e o Client Secret do Mercado Livre não sai do computador. Os dados só atualizam com o computador ligado.
 
-```bash
-cd web
-npm install
-npm run dev
-```
+Na versão hospedada ficam as telas Painel, Em alta, Mercado Livre, Shopee e Cotações, só para leitura. Pedidos ao Claude, Integrações e os comandos do minerador dependem do backend local e ficam de fora.
 
-Sem configuração, abre em **modo demonstração** em `http://127.0.0.1:5173` e lê a central do minerador local, que precisa estar ligada.
+**No Supabase**
 
-Para ler o Supabase e exigir login:
+1. Rode `supabase/schema.sql` e depois `supabase/hospedagem.sql` no SQL Editor. O segundo cria `chs_retratos` e libera só leitura, e só para usuário logado.
+2. Em Authentication, desligue o cadastro público e crie um usuário para cada pessoa que vai acessar. Todos veem os mesmos dados.
 
-1. Rode `supabase/politicas-web.sql` no SQL Editor do projeto. Libera só leitura, e só para usuário logado.
-2. Em Authentication, desligue o cadastro público e crie o usuário pelo painel.
-3. Copie `web/.env.example` para `web/.env.local` e preencha o endereço do projeto e a chave **pública** (anon/publishable). A chave secreta nunca entra aqui.
-4. Para o banco receber as minerações do minerador autônomo, defina `SUPABASE_URL` e `SUPABASE_KEY` (a secreta) como variáveis de ambiente do Windows.
+**No computador do minerador**
 
-`npm run build` gera o site estático em `web/dist`, pronto para qualquer hospedagem de arquivos.
+3. Defina `SUPABASE_URL` e `SUPABASE_KEY` (a chave **secreta**) como variáveis de ambiente do Windows e reinicie o minerador. A cada mineração ele envia os produtos, a última leitura da Shopee e as cotações. `node scripts/claude.js sincronizar` envia a Shopee e as cotações na hora.
+
+**No GitHub**
+
+4. Em Settings > Pages, escolha a fonte **GitHub Actions**.
+5. Em Settings > Secrets and variables > Actions > Variables, crie `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (a chave **pública**, anon/publishable). Ela vai dentro do site, visível a qualquer visitante; a secreta nunca entra aqui.
+6. O fluxo `.github/workflows/publicar-site.yml` publica a cada alteração em `web/`, ou manualmente pela aba Actions.
+
+Para testar a versão com login no próprio computador, copie `web/.env.example` para `web/.env.local`, preencha as duas variáveis e rode `npm run dev` em `web/`.
 
 ## Minerador autônomo e central
 

@@ -141,12 +141,60 @@ async function comando(caminho, corpo) {
   return dados;
 }
 
+// Um retrato enviado pelo minerador (chs_retratos): "shopee" ou "cotacoes".
+async function retrato(chave) {
+  const linhas = conferir(await supabase.from('chs_retratos').select('dados, atualizado_em').eq('chave', chave).limit(1));
+  return linhas.length ? linhas[0].dados : null;
+}
+
+// Produtos das mineracoes das ultimas 36 horas, a mais recente de cada categoria.
+async function produtosDoSupabase() {
+  const desde = new Date(Date.now() - 36 * 3600 * 1000).toISOString();
+  const mineracoes = conferir(await supabase.from('chs_mineracoes').select('id, categoria_id, consultado_em')
+    .gte('consultado_em', desde).order('consultado_em', { ascending: false }).limit(200));
+  const vistas = new Set();
+  const ids = mineracoes.filter((m) => !vistas.has(m.categoria_id) && vistas.add(m.categoria_id)).map((m) => m.id);
+  if (!ids.length) return { total: 0, itens: [] };
+  const linhas = await todasAsLinhas(() => supabase.from('chs_produtos')
+    .select('mineracao_id, produto_id, nome, categoria, foto, link, melhor_posicao, menor_preco, situacao, prioridade, ncm_posicao, ncm_codigos, estimativa_fonte, estimativa_periodo, estimativa_vendas, avaliacoes:dados->estimativa_externa->avaliacoes, nota:dados->estimativa_externa->avaliacao')
+    .in('mineracao_id', ids).not('nome', 'is', null).order('prioridade', { ascending: false }).order('produto_id'));
+  const itens = linhas.slice(0, 200).map((p) => ({
+    id: p.produto_id,
+    nome: p.nome,
+    categoria: p.categoria,
+    foto: p.foto,
+    link: p.link,
+    posicao: p.melhor_posicao,
+    menor_preco: p.menor_preco === null ? undefined : Number(p.menor_preco),
+    situacao: p.situacao,
+    prioridade: p.prioridade,
+    ncm: Array.isArray(p.ncm_codigos) && p.ncm_codigos.length ? p.ncm_codigos[0] : (p.ncm_posicao ? `posição ${p.ncm_posicao.split(' ou ')[0]}` : undefined),
+    vendas_estimadas: p.estimativa_vendas === null ? undefined : Number(p.estimativa_vendas),
+    avaliacoes: typeof p.avaliacoes === 'number' ? p.avaliacoes : undefined,
+    nota: typeof p.nota === 'number' ? p.nota : undefined,
+    fonte_da_estimativa: p.estimativa_fonte ? `${p.estimativa_fonte}, por ${p.estimativa_periodo === 'mensal' ? 'mês' : 'semana'}` : undefined,
+    mineracao_id: p.mineracao_id,
+  }));
+  return { total: linhas.length, itens };
+}
+
+async function pacoteDoSupabase(id) {
+  const r = await retrato('cotacoes');
+  const pacote = r && r.pacotes.find((p) => p.id === id);
+  if (!pacote || !pacote.linhas) throw new Error('Esta cotação ainda não foi enviada pelo minerador.');
+  return { id, linhas: pacote.linhas };
+}
+
 export const carregarEstado = () => local('/api/estado');
 export const carregarIntegracoes = () => local('/api/integracoes');
-export const carregarProdutos = () => local('/api/produtos');
-export const carregarShopee = () => local('/api/shopee');
-export const carregarPacotes = () => local('/api/accio');
-export const carregarPacote = (id) => local(`/api/accio/pacote?id=${encodeURIComponent(id)}`);
+export const carregarProdutos = () => (comSupabase ? produtosDoSupabase() : local('/api/produtos'));
+export const carregarShopee = () => (comSupabase
+  ? retrato('shopee').then((r) => r || { itens: [], consultado_em: null })
+  : local('/api/shopee'));
+export const carregarPacotes = () => (comSupabase
+  ? retrato('cotacoes').then((r) => r || { pacotes: [] })
+  : local('/api/accio'));
+export const carregarPacote = (id) => (comSupabase ? pacoteDoSupabase(id) : local(`/api/accio/pacote?id=${encodeURIComponent(id)}`));
 export const carregarPedidos = () => local('/api/pedidos');
 export const criarPedido = (pedido) => comando('/api/pedidos', pedido);
 export const gerarPlanilhas = (id) => comando(`/api/accio/planilha?id=${encodeURIComponent(id)}`);

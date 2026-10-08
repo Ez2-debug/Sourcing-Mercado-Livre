@@ -1,0 +1,66 @@
+# Publica o aplicativo web no GitHub Pages.
+#
+# Antes da primeira publicacao, no repositorio:
+#   1. Settings > Pages > Source: "GitHub Actions".
+#   2. Settings > Secrets and variables > Actions > Variables:
+#        VITE_SUPABASE_URL       https://<projeto>.supabase.co
+#        VITE_SUPABASE_ANON_KEY  a chave PUBLICA (anon / publishable) do projeto
+#
+# A chave publica vai dentro do site, visivel a qualquer visitante; e para isso
+# que ela existe. A chave secreta nunca entra aqui.
+
+name: Publicar site
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/publicar-site.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Conferir a configuracao
+        env:
+          URL: ${{ vars.VITE_SUPABASE_URL }}
+          CHAVE: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$CHAVE" ]; then
+            echo "::error::Defina as variaveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY em Settings > Secrets and variables > Actions > Variables."
+            exit 1
+          fi
+      - name: Compilar
+        working-directory: web
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_COTACAO_URL: ${{ vars.VITE_COTACAO_URL }}
+          VITE_BASE: /${{ github.event.repository.name }}/
+        run: |
+          npm ci
+          npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

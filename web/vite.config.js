@@ -8,6 +8,8 @@ import tailwindcss from '@tailwindcss/vite';
 const backend = { target: 'http://127.0.0.1:4310', changeOrigin: true };
 
 export default defineConfig({
+  // No GitHub Pages o site fica em /<repositorio>/; o fluxo de publicacao informa por VITE_BASE.
+  base: process.env.VITE_BASE || '/',
   plugins: [react(), tailwindcss()],
   server: { port: 5173, host: '127.0.0.1', proxy: { '/api': backend, '/mineracao': backend } },
 });

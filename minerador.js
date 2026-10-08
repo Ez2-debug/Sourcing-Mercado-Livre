@@ -34,6 +34,7 @@ const { PERIODOS, emAlta } = require('./server/emalta');
 const { detalharPacote, listarPacotes } = require('./server/accio');
 const { planilhasDaCotacao } = require('./server/cotacao');
 const { lerShopee } = require('./server/shopee');
+const { sincronizarRetratos } = require('./server/supabase');
 const { TIPOS, criarPedido, lerPedidos } = require('./server/pedidos');
 const { todosOsProdutos } = require('./server/mineracao');
 const { ncmCurto, situacao: situacaoDoProduto } = require('./server/indicadores');
@@ -200,6 +201,9 @@ async function ciclo() {
       aptos: r.arquivos.indicadores.triagem.apto,
     });
     log(`concluida ${r.m.id}: ${r.arquivos.indicadores.totais.produtos} produtos`);
+    // Leva a Shopee e as cotacoes para o aplicativo hospedado, se o Supabase estiver configurado.
+    const retratos = await sincronizarRetratos();
+    if (retratos && retratos.erro) log(`retratos nao enviados: ${retratos.erro}`);
   } catch (err) {
     // Uma falha (rede, limite da API) nao para o minerador: fica registrada e
     // a fila segue no proximo intervalo.

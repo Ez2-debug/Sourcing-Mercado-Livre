@@ -343,6 +343,8 @@ function Tendencia({ valor }) {
 
 function PedirAoClaude({ pedido, rotulo }) {
   const [estado, setEstado] = useState(null);
+  // Na versao hospedada nao ha backend local para receber o pedido.
+  if (comSupabase) return null;
   const pedir = () => criarPedido(pedido).then(() => setEstado('ok'), (e) => setEstado(e.message));
   if (estado === 'ok') return <Selo tom="primario"><Bot className="size-3" />Pedido na fila do Claude</Selo>;
   return <Botao pequeno onClick={pedir} title={estado || ''}><Bot className="size-4" />{rotulo}</Botao>;
@@ -452,7 +454,7 @@ function Cotacoes() {
                 <td>
                   <div className="flex flex-wrap gap-2">
                     {p.sourcing
-                      ? <><Botao pequeno onClick={() => setAberto(p)}>Ver cotação</Botao><Botao pequeno onClick={() => planilhas(p)}><FileSpreadsheet className="size-4" />Gerar planilhas</Botao></>
+                      ? <><Botao pequeno onClick={() => setAberto(p)}>Ver cotação</Botao>{!comSupabase && <Botao pequeno onClick={() => planilhas(p)}><FileSpreadsheet className="size-4" />Gerar planilhas</Botao>}</>
                       : <PedirAoClaude pedido={{ tipo: 'cotacao', alvo: p.id }} rotulo="Pedir cotação" />}
                   </div>
                 </td>
@@ -536,7 +538,7 @@ function Integracoes() {
 /* Aplicativo                                                          */
 /* ------------------------------------------------------------------ */
 
-const TELAS = [
+const TODAS_AS_TELAS = [
   ['painel', 'Painel', LayoutDashboard, Painel, 'Mineração ao vivo e resumo do dia'],
   ['alta', 'Em alta', TrendingUp, EmAlta, 'Produtos aptos que subiram no ranking do Mercado Livre'],
   ['ml', 'Mercado Livre', Store, MercadoLivre, 'Produtos minerados pela API oficial'],
@@ -545,6 +547,8 @@ const TELAS = [
   ['pedidos', 'Pedidos ao Claude', Bot, Pedidos, 'Fila do que só o Claude executa'],
   ['integracoes', 'Integrações', Plug, Integracoes, 'Situação de cada ligação'],
 ];
+// Pedidos e Integracoes falam com o backend deste computador; na versao hospedada ficam de fora.
+const TELAS = TODAS_AS_TELAS.filter(([id]) => !comSupabase || !['pedidos', 'integracoes'].includes(id));
 
 export default function App() {
   const [sessao, setSessao] = useState(undefined);

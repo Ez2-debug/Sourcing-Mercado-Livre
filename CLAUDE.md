@@ -38,7 +38,8 @@ A extensão instalada continua sendo a que o Claude Desktop executa; alteraçõe
 - `server/planilha.js` e `server/xlsx.js` — exportação para Excel com fotos; `xlsx.js` monta o arquivo (ZIP e XML) sem bibliotecas.
 - `server/supabase.js` e `supabase/schema.sql` — gravação das minerações no Supabase pela API REST, e as tabelas.
 - `web/` — aplicativo web (React + Vite + Tailwind, componentes no estilo shadcn/ui em `web/src/ui.jsx`, tema em `web/src/estilos.css`). O minerador serve `web/dist` na raiz e a central antiga em `/central`. Telas: Painel, Em alta, Mercado Livre, Shopee, Cotações, Pedidos ao Claude e Integrações. Sem Supabase configurado, lê a central local (modo demonstração). `web/src/emalta.js` repete a regra de `server/emalta.js` sobre as linhas do banco.
-- `supabase/politicas-web.sql` — leitura das tabelas só para usuário logado.
+- `supabase/hospedagem.sql` — tabela `chs_retratos` (Shopee e cotações para o site) e leitura das tabelas só para usuário logado.
+- `.github/workflows/publicar-site.yml` — publica `web/` no GitHub Pages, com a chave pública do Supabase vinda das variáveis do repositório.
 - `test/` — testes com `node:test` contra uma API simulada.
 
 O servidor MCP e o minerador não têm dependências externas: só módulos do Node (>= 18). As dependências do `web/` ficam só nele.

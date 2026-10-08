@@ -56,7 +56,7 @@ async function upsert(cfg, tabela, conflito, linhas) {
     let detalhe = '';
     try { const corpo = await res.json(); detalhe = corpo.message || corpo.error || corpo.code || ''; } catch (_) { /* sem corpo */ }
     if (res.status === 404 || /PGRST205|does not exist|schema cache/i.test(detalhe)) {
-      throw new ToolError(`A tabela ${tabela} nao existe no projeto. Rode supabase/schema.sql no SQL Editor do Supabase e tente de novo.`);
+      throw new ToolError(`A tabela ${tabela} nao existe no projeto. Rode supabase/schema.sql e supabase/hospedagem.sql no SQL Editor do Supabase e tente de novo.`);
     }
     if (res.status === 401 || res.status === 403) {
       throw new ToolError(`O Supabase recusou a chave (HTTP ${res.status}). Use a chave secreta (service role) do projeto na configuracao da extensao.`);
@@ -148,4 +148,36 @@ async function salvarSeConfigurado(m) {
   }
 }
 
-module.exports = { configurado, salvarNoSupabase, salvarSeConfigurado };
+// Retratos para o aplicativo web hospedado: a ultima leitura da Shopee e as
+// cotacoes dos pacotes. Cada um e uma linha de chs_retratos, substituida a
+// cada envio. Nunca derruba quem chamou; o erro volta no resultado.
+async function sincronizarRetratos() {
+  if (!configurado()) return undefined;
+  // Carregados aqui para este modulo nao depender deles ao ser importado.
+  const { lerShopee } = require('./shopee');
+  const { detalharPacote, listarPacotes } = require('./accio');
+  try {
+    const cfg = config();
+    const agora = new Date().toISOString();
+    const pacotes = listarPacotes().pacotes.map((p) => {
+      // Caminhos do computador nao vao para a nuvem.
+      const { pasta, pedido, ...resto } = p;
+      const sourcing = p.sourcing ? { feito_em: p.sourcing.feito_em, candidatos: p.sourcing.candidatos, ligado_por: p.sourcing.ligado_por } : null;
+      let linhas = null;
+      if (p.sourcing) {
+        try { linhas = detalharPacote(p.id).linhas; } catch (_) { linhas = null; }
+      }
+      return { ...resto, sourcing, linhas };
+    });
+    const linhas = [{ chave: 'cotacoes', atualizado_em: agora, dados: { pacotes } }];
+    const shopee = lerShopee();
+    if (shopee) linhas.push({ chave: 'shopee', atualizado_em: agora, dados: shopee });
+    await upsert(cfg, 'chs_retratos', 'chave', linhas);
+    return { projeto: new URL(cfg.url).hostname, retratos: linhas.map((l) => l.chave) };
+  } catch (err) {
+    if (!(err instanceof ToolError)) throw err;
+    return { erro: err.message };
+  }
+}
+
+module.exports = { configurado, salvarNoSupabase, salvarSeConfigurado, sincronizarRetratos };
