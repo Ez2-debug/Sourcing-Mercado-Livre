@@ -42,6 +42,9 @@ const { atualizarTendencias, lerTendencias } = require('./server/tendencias');
 const { atualizarImportacoes, lerImportacoes } = require('./server/comtrade');
 const { carregarTabela } = require('./server/ncm');
 const { montarRadar } = require('./server/radar');
+const { atualizarAduana, tendenciasDaAduana } = require('./server/aduanapy');
+const { atualizarBuscas, lerBuscas } = require('./server/buscasgoogle');
+const { lerInternacional } = require('./server/internacional');
 const { siteDoId } = require('./server/meli');
 const { sincronizarRetratos } = require('./server/supabase');
 const { TIPOS, criarPedido, lerPedidos } = require('./server/pedidos');
@@ -342,6 +345,24 @@ function integracoes() {
       atualizado_em: lerJoompro() ? lerJoompro().consultado_em : null,
     },
     {
+      id: 'aduana-py', nome: 'Paraguai (aduana)', via: 'Dados abertos da aduana do Paraguai (DNIT)',
+      ok: Boolean(tendenciasDaAduana()),
+      detalhe: tendenciasDaAduana() ? `Importações de ${tendenciasDaAduana().mes} comparadas com ${tendenciasDaAduana().comparado_com || 'o mês anterior'}. O portal publica um arquivo por mês.` : 'Primeira carga ainda não feita.',
+      atualizado_em: null,
+    },
+    {
+      id: 'google', nome: 'Buscas do Google', via: 'Feed público do Google Trends (6 países)',
+      ok: Boolean(lerBuscas()),
+      detalhe: 'Assuntos mais buscados no dia, atualizados a cada três horas.',
+      atualizado_em: lerBuscas() ? lerBuscas().consultado_em : null,
+    },
+    {
+      id: 'internacional', nome: 'Importados → Brasil', via: 'JoomPulse (Compra Internacional do Mercado Livre e lojas internacionais da Shopee), buscado pelo Claude',
+      ok: Boolean(lerInternacional()),
+      detalhe: lerInternacional() ? `${lerInternacional().china.total} anúncios da China e ${lerInternacional().eua.total} dos EUA no Mercado Livre; ${lerInternacional().shopee.total} da Shopee. Pedidos são estimativas do JoomPulse.` : 'Ainda sem leitura. Peça a atualização ao Claude.',
+      atualizado_em: lerInternacional() ? lerInternacional().mercado_livre_em : null,
+    },
+    {
       id: 'paraguai', nome: 'Paraguai (importações)', via: 'UN Comtrade, base pública da ONU',
       ok: Boolean(lerImportacoes('PRY')),
       detalhe: lerImportacoes('PRY') ? `Importações de ${lerImportacoes('PRY').ano} contra ${lerImportacoes('PRY').ano_anterior}, por tipo de produto.` : 'Coleta mensal ainda não feita.',
@@ -398,13 +419,23 @@ function radar() {
     tendencias: lerTendencias(),
     joompro: lerJoompro(),
     paraguai: lerImportacoes('PRY'),
+    aduana: tendenciasDaAduana(),
+    buscas: lerBuscas(),
     amazon: amazon.lerComparacao(),
+    internacional: lerInternacional(),
   });
   return radarGuardado;
 }
 
-// Importacoes do Paraguai: o arquivo vale 30 dias; a coleta so roda quando vence.
+// Paraguai: ONU (vale 30 dias), aduana (confere todo dia se saiu mes novo; o
+// arquivo e grande, entao so uma coleta por vez) e buscas do Google (a cada 3 h).
+let aduanaRodando = false;
 function atualizarParaguai() {
+  atualizarBuscas().then(() => { radarGuardado = null; }).catch((err) => log(`buscas do Google: ${err.message}`));
+  if (!aduanaRodando) {
+    aduanaRodando = true;
+    atualizarAduana().then(() => { radarGuardado = null; }).catch((err) => log(`aduana do Paraguai: ${err.message}`)).finally(() => { aduanaRodando = false; });
+  }
   return carregarTabela().then((t) => atualizarImportacoes('PRY', t)).catch((err) => log(`importacoes do Paraguai: ${err.message}`));
 }
 
@@ -511,6 +542,8 @@ function atender(req, res) {
   if (caminho === '/api/produtos') return json(res, 200, produtosDoDia());
   if (caminho === '/api/amazon') return json(res, 200, { configurada: amazon.configurada(), comparacao: amazon.lerComparacao() });
   if (caminho === '/api/radar') return json(res, 200, radar());
+  if (caminho === '/api/internacional') return json(res, 200, lerInternacional() || { china: null, eua: null, shopee: null, nas_duas_lojas: [] });
+  if (caminho === '/api/paraguai') return json(res, 200, { aduana: tendenciasDaAduana(), buscas: lerBuscas() });
   if (caminho === '/api/tendencias') return json(res, 200, lerTendencias() || { paises: {}, consultado_em: null });
   if (caminho === '/api/cambio') return json(res, 200, cambioGuardado() || { venda: null });
   if (caminho === '/api/suportify') return json(res, 200, materialDoSuportify());

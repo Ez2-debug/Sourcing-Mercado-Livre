@@ -174,12 +174,18 @@ async function sincronizarRetratos() {
     if (shopee) linhas.push({ chave: 'shopee', atualizado_em: agora, dados: shopee });
     const comparacao = require('./amazon').lerComparacao();
     if (comparacao) linhas.push({ chave: 'amazon', atualizado_em: agora, dados: comparacao });
+    const aduana = require('./aduanapy').tendenciasDaAduana();
+    if (aduana) linhas.push({ chave: 'aduana-py', atualizado_em: agora, dados: aduana });
+    const buscas = require('./buscasgoogle').lerBuscas();
+    if (buscas) linhas.push({ chave: 'buscas-google', atualizado_em: agora, dados: { ...buscas, historico: undefined } });
     const paraguai = require('./comtrade').lerImportacoes('PRY');
     if (paraguai) linhas.push({ chave: 'paraguai', atualizado_em: agora, dados: paraguai });
     const tendencias = require('./tendencias').lerTendencias();
     if (tendencias) linhas.push({ chave: 'tendencias', atualizado_em: agora, dados: tendencias });
     const cambio = require('./cambio').cambioGuardado();
     if (cambio) linhas.push({ chave: 'cambio', atualizado_em: agora, dados: cambio });
+    const internacional = require('./internacional').lerInternacional();
+    if (internacional) linhas.push({ chave: 'internacional', atualizado_em: agora, dados: internacional });
     const joompro = require('./joompro').lerJoompro();
     if (joompro) linhas.push({ chave: 'joompro', atualizado_em: agora, dados: joompro });
     await upsert(cfg, 'chs_retratos', 'chave', linhas);

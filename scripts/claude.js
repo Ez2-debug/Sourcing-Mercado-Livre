@@ -11,6 +11,8 @@
  *   node scripts/claude.js shopee-relacionados <arquivo>   itens da Shopee buscados pelo nome dos produtos cotados
  *   node scripts/claude.js joompro-consulta                a consulta para query_cubejs_joompro
  *   node scripts/claude.js joompro-gravar <arquivo.json>   grava a resposta do JoomPulse
+ *   node scripts/claude.js internacional-consulta <ml|ml-us|shopee>  consulta ao JoomPulse do que o Brasil compra de fora
+ *   node scripts/claude.js internacional-gravar <ml|ml-us|shopee> <arquivo.json>  grava a resposta
  *   node scripts/claude.js cotacao <id do pacote>          gera as duas planilhas da cotacao
  *   node scripts/claude.js sincronizar                     envia Shopee e cotacoes ao Supabase
  */
@@ -48,6 +50,13 @@ async function main() {
   }
   if (comando === 'joompro-gravar') {
     const gravado = servidor('joompro').gravarJoompro(fs.readFileSync(resto[0], 'utf8'));
+    return { ...gravado, supabase: await servidor('supabase').sincronizarRetratos() };
+  }
+  if (comando === 'internacional-consulta') {
+    return JSON.parse(servidor('internacional').consultaInternacional(resto[0] || 'ml'));
+  }
+  if (comando === 'internacional-gravar') {
+    const gravado = servidor('internacional').gravarInternacional(resto[0], fs.readFileSync(resto[1], 'utf8'));
     return { ...gravado, supabase: await servidor('supabase').sincronizarRetratos() };
   }
   if (comando === 'sincronizar') {

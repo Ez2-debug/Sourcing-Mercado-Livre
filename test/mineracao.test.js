@@ -750,3 +750,87 @@ test('radar: um bloco por mercado, sinais cruzados e Paraguai so com bens de con
   assert.ok(r.cruzados.some((c) => /Cortina Blackout/.test(c.titulo)), 'Shopee em alta que tambem e busca no Mercado Livre');
   assert.equal(m.amazon.pendente, true);
 });
+
+test('aduana do Paraguai: le o CSV em fluxo, fica so com importacao de consumo e compara meses', async () => {
+  const { processarMes, tendenciasDaAduana } = require('../server/aduanapy');
+  const cab = '﻿"DESPACHO CIFRADO","OPERACION","DESTINACION","PAIS ORIGEN","FOB DOLAR","POSICION ","DESC PARTIDA","MERCADERIA","MARCA ITEM"\n';
+  const linha = (op, reg, pais, fob, ncm, merc, marca) => `"x","${op}","${reg}","${pais}","${fob}","${ncm}","Desc ${ncm}","${merc}","${marca}"\n`;
+  const arquivo = (linhas) => ({ ok: true, status: 200, body: (async function* () { const t = cab + linhas.join(''); yield new TextEncoder().encode(t.slice(0, 40)); yield new TextEncoder().encode(t.slice(40)); })() });
+  const meses = {
+    '2026_AGOSTO': [linha('IMPORTACION', 'IC04', 'CN - CHINA', '30000,0', '7117.19.00.000A', 'COLLARES', 'SIN MARCA')],
+    '2026_SEPTIEMBRE': [
+      linha('IMPORTACION', 'IC04', 'CN - CHINA', '90000,5', '7117.19.00.000A', 'COLLARES, PULSERAS', 'SIN MARCA'),
+      linha('IMPORTACION', 'IC04', 'CN - CHINA', '50000,0', '8410.11.00.000B', 'TURBINA', 'ACME'),
+      linha('EXPORTACION', 'EC01', 'PY - PARAGUAY', '99999,0', '7117.19.00.000A', 'X', 'Y'),
+      linha('IMPORTACION', 'IC04', 'US - ESTADOS UNIDOS', '25000,0', '8518.30.00.000C', 'AURICULARES "PRO"', 'SONIX'),
+    ],
+  };
+  const buscar = async (url) => {
+    const nome = Object.keys(meses).find((k) => url.includes(k));
+    return nome ? arquivo(meses[nome]) : { ok: false, status: 404 };
+  };
+  const set = await processarMes(2026, 9, buscar);
+  assert.equal(set.ncm.length, 2, 'exportacao e turbina ficam de fora');
+  assert.equal(set.ncm[0].ncm, '7117.19.00');
+  assert.equal(set.ncm[0].fob_usd, 90001);
+  assert.equal(set.ncm[0].origens[0].pais, 'CHINA');
+  assert.deepEqual(set.marcas.map((m) => m.marca), ['SONIX'], 'SIN MARCA nao conta como marca');
+  assert.equal(await processarMes(2026, 10, buscar), null, 'mes nao publicado devolve null');
+  await assert.rejects(() => processarMes(2026, 7, async () => arquivo([linha('EXPORTACION', 'EC01', 'PY - PARAGUAY', '1,0', '7117.19.00.000A', 'X', 'Y')])), /nenhuma importacao/);
+  await processarMes(2026, 8, buscar);
+  const t = tendenciasDaAduana(new Date(2026, 9, 21));
+  assert.equal(t.mes, '2026-09');
+  assert.equal(t.comparado_com, '2026-08');
+  assert.equal(t.subindo[0].ncm, '7117.19.00');
+  assert.equal(t.subindo[0].variacao_mes, 2);
+});
+
+test('buscas do Google: le o feed e conta os dias em alta', async () => {
+  const { atualizarBuscas } = require('../server/buscasgoogle');
+  const feed = '<rss><channel><item><title>halloween</title><ht:approx_traffic>1000+</ht:approx_traffic><ht:news_item><ht:news_item_title>Fiesta</ht:news_item_title><ht:news_item_url>https://abc.com.py/x</ht:news_item_url></ht:news_item></item></channel></rss>';
+  const r = await atualizarBuscas(async () => ({ ok: true, text: async () => feed }), new Date('2026-10-21T12:00:00Z'));
+  assert.equal(r.paises.PY.itens[0].termo, 'halloween');
+  assert.equal(r.paises.PY.itens[0].trafego, '1000+');
+  assert.equal(r.paises.PY.itens[0].link, 'https://abc.com.py/x');
+  assert.equal(r.paises.PY.itens[0].dias_em_alta, 1);
+});
+
+test('importados: separa China e EUA, tira marca e regulado das oportunidades e cruza com a Shopee', () => {
+  const { gravarInternacional, lerInternacional } = require('../server/internacional');
+  const colunas = ['id', 'productId', 'productName', 'productImage', 'merchantCategoryL1', 'merchantCategoryL2', 'brand', 'adPublishDate',
+    'shopCountry', 'priceAmount', 'orderCount1m', 'orderGmv1m', 'soldItem', 'reviewsCountMax', 'reviewsRating'];
+  const ml = (linhas) => JSON.stringify({ columns: colunas, data: linhas });
+  const agora = new Date('2026-10-21T12:00:00Z');
+  gravarInternacional('ml', ml([
+    ['MLB1', 'P1', 'Tênis De Corrida Placa De Carbono Unissex', 'https://x/1.webp', 'Calçados', 'Tênis', null, '2026-10-01T00:00:00.000', 'CN', 97.99, 14000, 1, 5000, 300, 4.7],
+    ['MLB2', 'P2', 'Tênis De Corrida Placa De Carbono Unissex', 'https://x/2.webp', 'Calçados', 'Tênis', null, '2025-01-01T00:00:00.000', 'CN', 99, 900, 1, 500, 10, 4],
+    ['MLB3', 'P3', 'Brinquedo Squishy Animal', null, 'Brinquedos e Hobbies', 'Anti-stress', null, '2025-01-01T00:00:00.000', 'CN', 20, 800, 1, 500, 10, 4],
+  ]), agora);
+  gravarInternacional('ml-us', ml([
+    ['MLB4', 'P4', 'Echo Dot 5ª Geração', null, 'Eletrônicos', 'Áudio', 'AMAZON', '2022-01-01T00:00:00.000', 'US', 400, 200, 1, 10000, 4000, 5],
+    ['MLB5', 'P5', 'Centrum Multivitaminico 200 Tabletes', null, 'Saúde', 'Suplementos Alimentares', 'GENERIC', '2026-01-01T00:00:00.000', 'US', 160, 90, 1, 500, 100, 4.9],
+    ['MLB6', 'P6', 'Multímetro Digital Recarregável', null, 'Construção', 'Energia', null, '2026-10-02T00:00:00.000', 'US', 400, 100, 1, 100, null, null],
+  ]), agora);
+  const sh = JSON.stringify({
+    columns: ['itemId', 'shopId', 'itemName', 'categoryL1Name', 'categoryName', 'shopName', 'shopLocation', 'hasBrand', 'price', 'sold30Days', 'salesTrend'],
+    data: [
+      [1, 9, 'Tênis De Corrida Ultraleve Com Placa De Carbono', 'Esportes', 'Tênis de Corrida', 'L', 'Internacional', null, 83, 30000, 50],
+      [2, 9, 'Ventilador Portátil', 'Casa', 'Ventiladores', 'L', 'Internacional', null, 58, 10000000, 5],
+      [3, 9, 'Capinha Nacional', 'Celulares', 'Capas', 'L', 'São Paulo', null, 10, 5000, 0],
+    ],
+  });
+  gravarInternacional('shopee', sh, agora);
+  const p = lerInternacional(agora);
+  assert.equal(p.china.total, 2, 'anuncio repetido pelo nome conta uma vez');
+  assert.deepEqual(p.china.oportunidades.map((x) => x.titulo), ['Tênis De Corrida Placa De Carbono Unissex']);
+  assert.ok(p.china.oportunidades[0].lancamento);
+  assert.match(p.china.oportunidades[0].sinal, /estimativa JoomPulse/);
+  assert.equal(p.china.regulados[0].regulatorio[0].orgao, 'Inmetro');
+  assert.deepEqual(p.eua.oportunidades.map((x) => x.titulo), ['Multímetro Digital Recarregável']);
+  assert.deepEqual(p.eua.referencia_de_marca.map((x) => x.marca), ['AMAZON']);
+  assert.ok(p.eua.regulados.some((x) => x.regulatorio.some((r) => r.orgao === 'Anvisa')), 'suplemento vai para Anvisa pela categoria');
+  assert.equal(p.shopee.total, 1, 'loja nacional fica de fora e venda absurda e descartada');
+  assert.equal(p.shopee.descartados_por_leitura_suspeita, 1);
+  assert.equal(p.nas_duas_lojas.length, 1);
+  assert.match(p.nas_duas_lojas[0].parecido.titulo, /Ultraleve/);
+});

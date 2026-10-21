@@ -4,7 +4,7 @@ import {
   Factory, Flag, Globe, Headset, Radar as IconeRadar, Sparkles, LayoutDashboard, PackageSearch, RefreshCw, Search, Ship, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
 } from 'lucide-react';
 import {
-  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarAmazon, carregarCambio, carregarIntegracoes, carregarRadar, carregarTendencias, carregarJoompro, carregarSuportify, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
+  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarAmazon, carregarCambio, carregarIntegracoes, carregarRadar, carregarInternacional, carregarTendencias, carregarJoompro, carregarSuportify, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
   carregarShopee, carregarVisaoGeral, comSupabase, comandarMinerador, compararNaAmazon, criarPedido, gerarPlanilhas, supabase,
 } from './fonte.js';
 import { Aviso, Botao, Card, CardTitulo, Carregando, Indicador, Selo, Tabela } from './ui.jsx';
@@ -505,10 +505,10 @@ function Radar() {
                 {m.categorias && m.categorias.length > 0 && <ul className="mb-3 grid gap-2.5">{m.categorias.map((c) => <ItemDoRadar key={c.codigo} item={c} />)}</ul>}
                 {m.termos && m.termos.length > 0 && (
                   <div>
-                    <div className="mb-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Mais buscados</div>
+                    <div className="mb-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{m.rotuloDosTermos || 'Mais buscados'}</div>
                     <div className="flex flex-wrap gap-1.5">{m.termos.map((t) => (linkSeguro(t.link)
-                      ? <a key={t.termo} href={t.link} target="_blank" rel="noopener noreferrer" className="rounded-full border px-2.5 py-0.5 text-xs hover:bg-muted">{t.termo}</a>
-                      : <span key={t.termo} className="rounded-full border px-2.5 py-0.5 text-xs">{t.termo}</span>))}</div>
+                      ? <a key={t.termo} href={t.link} target="_blank" rel="noopener noreferrer" className="rounded-full border px-2.5 py-0.5 text-xs hover:bg-muted">{t.termo}{t.extra ? <span className="text-muted-foreground"> · {t.extra}</span> : null}</a>
+                      : <span key={t.termo} className="rounded-full border px-2.5 py-0.5 text-xs">{t.termo}{t.extra ? <span className="text-muted-foreground"> · {t.extra}</span> : null}</span>))}</div>
                   </div>
                 )}
                 {!((m.produtos || []).length || (m.categorias || []).length || (m.termos || []).length) && <p className="text-sm text-muted-foreground">Sem dados nesta leitura.</p>}
@@ -516,6 +516,109 @@ function Radar() {
             ))}
           </div>
         </>
+      )}
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Importados para o Brasil (China e EUA)                              */
+/* ------------------------------------------------------------------ */
+
+const ABAS_IMPORTADOS = [
+  ['china', 'China', 'Mercado Livre, Compra Internacional com loja na China'],
+  ['eua', 'Estados Unidos', 'Mercado Livre, Compra Internacional com loja nos EUA'],
+  ['shopee', 'Shopee', 'Lojas internacionais (cross-border) da Shopee Brasil'],
+];
+
+function ListaDeImportados({ titulo, descricao, itens }) {
+  if (!itens || !itens.length) return null;
+  return (
+    <div className="mb-5">
+      <div className="mb-2"><h3 className="text-sm font-semibold">{titulo}</h3>{descricao && <p className="text-xs text-muted-foreground">{descricao}</p>}</div>
+      <ul className="grid gap-2.5 md:grid-cols-2">
+        {itens.map((p) => (
+          <li key={p.titulo + (p.link || '')} className="flex items-start gap-3 rounded-lg border p-2.5">
+            {p.foto ? <Foto src={p.foto} /> : null}
+            <div className="min-w-0 text-sm">
+              <div className="break-words">{p.link ? <Nome nome={p.titulo} link={p.link} /> : <span className="font-medium">{p.titulo}</span>}</div>
+              <div className="text-xs text-muted-foreground">{[typeof p.preco === 'number' ? dinheiro(p.preco, p.moeda) : '', p.sinal, p.detalhe].filter(Boolean).join(' · ')}</div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {p.lancamento && <Selo tom="primario">lançamento</Selo>}
+                {p.tendencia === 'subindo' && <Selo tom="ok">subindo</Selo>}
+                {p.marca && <Selo>marca {p.marca}</Selo>}
+                {(p.regulatorio || []).map((r) => <Selo key={r.orgao} tom="alerta">{r.orgao}</Selo>)}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function CategoriasImportadas({ categorias, campo }) {
+  if (!categorias || !categorias.length) return null;
+  const maior = Math.max(...categorias.map((c) => c[campo] || 0), 1);
+  return (
+    <div className="mb-5">
+      <h3 className="mb-2 text-sm font-semibold">Categorias que mais vendem de fora</h3>
+      <ul className="grid gap-1.5">
+        {categorias.map((c) => (
+          <li key={c.categoria} className="grid grid-cols-[minmax(0,180px)_1fr_auto] items-center gap-3 text-sm">
+            <span className="truncate">{c.categoria}</span>
+            <span className="h-2 rounded-full bg-muted"><span className="block h-2 rounded-full bg-primary" style={{ width: `${Math.max(2, (100 * (c[campo] || 0)) / maior)}%` }} /></span>
+            <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">{inteiro(c[campo])} · {c.anuncios} anúncios</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function Importados() {
+  const { dados: d, erro, carregando } = useDados(carregarInternacional, 0);
+  const [aba, setAba] = useState('china');
+  const atual = d && d[aba];
+  return (
+    <>
+      <Card className="mb-4">
+        <CardTitulo
+          titulo="O que o Brasil compra da China e dos EUA"
+          descricao={`Produtos vendidos ao Brasil por lojas de fora, no Mercado Livre (Compra Internacional) e na Shopee. Pedidos e vendas são estimativas do JoomPulse, não vendas reais; a lista é ordem de análise, não previsão.${d && d.mercado_livre_em ? ` Mercado Livre lido em ${hora(d.mercado_livre_em)}` : ''}${d && d.shopee_em ? `, Shopee em ${hora(d.shopee_em)}.` : ''}`}
+        />
+        <Estado erro={erro} carregando={carregando} dados={d} />
+        {d && !d.china && <p className="text-sm text-muted-foreground">Ainda sem leitura. Peça a atualização ao Claude.</p>}
+        {d && d.nas_duas_lojas && d.nas_duas_lojas.length > 0 && (
+          <ListaDeImportados titulo="Vendido de fora no Mercado Livre e na Shopee" descricao="O mesmo tipo de produto nos dois canais: demanda confirmada. O par é feito pelo nome e precisa ser conferido." itens={d.nas_duas_lojas} />
+        )}
+        {d && d.pendentes && (
+          <div className="flex flex-wrap gap-2">{d.pendentes.map((p) => <Selo key={p.id} tom="alerta">{p.nome}: {p.motivo}</Selo>)}</div>
+        )}
+      </Card>
+      {d && d.china && (
+        <Card>
+          <div className="mb-4 flex flex-wrap gap-1.5" role="tablist">
+            {ABAS_IMPORTADOS.map(([id, rotulo]) => (
+              <button key={id} role="tab" aria-selected={aba === id} onClick={() => setAba(id)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium ${aba === id ? 'bg-accent text-primary' : 'text-muted-foreground hover:bg-muted'}`}>
+                {rotulo} <span className="text-xs tabular-nums">({inteiro(d[id] && d[id].total)})</span>
+              </button>
+            ))}
+          </div>
+          <p className="mb-4 text-xs text-muted-foreground">{ABAS_IMPORTADOS.find(([id]) => id === aba)[2]}.</p>
+          {atual && (
+            <>
+              <CategoriasImportadas categorias={atual.categorias} campo={aba === 'shopee' ? 'vendas_30_dias' : 'pedidos_mes'} />
+              <ListaDeImportados titulo="Oportunidades para importar" descricao="Sem marca de terceiros e sem órgão regulador no caminho, na ordem de pedidos estimados." itens={atual.oportunidades} />
+              <ListaDeImportados titulo="Lançamentos que já vendem" descricao="Anúncios publicados nos últimos 60 dias." itens={atual.lancamentos} />
+              <ListaDeImportados titulo="Vendas subindo" itens={atual.subindo} />
+              <ListaDeImportados titulo="Referência de demanda (marca de terceiros)" descricao="Mostram o que o público procura; revender marca exige autorização do dono." itens={atual.referencia_de_marca} />
+              <ListaDeImportados titulo="Regulados" descricao="Precisam de certificação ou registro (Anvisa, Anatel, Inmetro) antes de importar para revenda." itens={atual.regulados} />
+              {!(atual.oportunidades || []).length && <p className="text-sm text-muted-foreground">Sem oportunidades nesta leitura.</p>}
+            </>
+          )}
+        </Card>
       )}
     </>
   );
@@ -997,6 +1100,7 @@ function Integracoes() {
 
 const TODAS_AS_TELAS = [
   ['radar', 'Radar de tendências', IconeRadar, Radar, 'O que está em alta em cada mercado, com a fonte de cada sinal', 'Visão geral'],
+  ['importados', 'Importados → Brasil', Ship, Importados, 'O que o Brasil compra da China e dos EUA, no Mercado Livre e na Shopee', 'Visão geral'],
   ['painel', 'Painel', LayoutDashboard, Painel, 'Mineração ao vivo e resumo do dia', 'Visão geral'],
   ['alta', 'Em alta', TrendingUp, EmAlta, 'Produtos aptos que subiram no ranking do Mercado Livre', 'Visão geral'],
   ['ml', 'Mercado Livre · Brasil', Store, MercadoLivreBrasil, 'Ranking do Mercado Livre Brasil: a demanda que a Compra Internacional atende', 'Marketplaces'],
