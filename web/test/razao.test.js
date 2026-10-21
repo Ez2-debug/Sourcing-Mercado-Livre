@@ -28,7 +28,7 @@ test('acha o parecido na Shopee pelo tipo do produto e mais uma palavra', () => 
 });
 
 test('o composto abre no painel e liga custo e margem as premissas', () => {
-  const r = montarRazao('composto', { ...entrada, cambio: { venda: 5, fonte: 'PTAX', cotado_em: '2026-10-08 13:08' } });
+  const r = montarRazao('composto', { ...entrada, cambio: { venda: 5, fonte: 'PTAX', cotado_em: '2026-10-08 13:08', mxn: { venda: 0.27, fonte: 'ML', cotado_em: '2026-10-21 14:11' } } });
   assert.deepEqual(r.abas.map((a) => a.nome), ['Painel', 'Razão composto', 'Mercado Livre', 'Alibaba', 'Shopee', 'Sobre']);
   const composto = r.abas[1];
   const titulos = composto.colunas.map(([t]) => t);
@@ -49,7 +49,9 @@ test('o composto abre no painel e liga custo e margem as premissas', () => {
 
   const painel = r.abas[0];
   const premissas = painel.linhas.filter((l) => l[2] && l[2].estilo === 'entrada');
-  assert.deepEqual(premissas.map((l) => l[2].v), [5, 0, 0], 'so o dolar vem preenchido; custos e comissao comecam em zero');
+  assert.deepEqual(premissas.map((l) => l[2].v), [5, 0, 0, 0.27], 'dolar e peso vem preenchidos; custos e comissao comecam em zero');
+  assert.match(de(primeira, 'ML: menor preço (R$)').formula, /Painel!\$C\$8/, 'o preco em reais converte o peso pela premissa');
+  assert.equal(de(primeira, 'Moeda'), 'BRL');
   assert.equal(painel.linhas[4][2].estilo, 'entrada', 'o dolar fica em C5, onde as formulas apontam');
   assert.ok(painel.linhas.some((l) => l[2] && /SUMIF\(.*"Cotar"/.test(l[2].formula || '')));
 });

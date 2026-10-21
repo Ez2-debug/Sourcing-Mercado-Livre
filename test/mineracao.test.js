@@ -697,3 +697,31 @@ test('tendencias por pais: guarda o que veio e mantem o anterior quando um pais 
   assert.equal(r.paises.MLC.termos.length, 0);
   assert.equal(r.paises.MLC.erro, 'nao disponivel');
 });
+
+test('Mexico: triagem com marcas locais e orgaos mexicanos', () => {
+  const { classificarMarca } = require('../server/marcas');
+  const { sinaisRegulatorios } = require('../server/mineracao');
+  assert.equal(classificarMarca('Pinol'), 'conhecida');
+  assert.equal(classificarMarca('Truper'), 'conhecida');
+  assert.deepEqual(sinaisRegulatorios('Audífonos Inalámbricos Bluetooth 5.3', 'MLM').map((r) => r.orgao), ['Telecom (MX)']);
+  assert.deepEqual(sinaisRegulatorios('Crema Hidratante Facial 50ml', 'MLM').map((r) => r.orgao), ['COFEPRIS']);
+  assert.deepEqual(sinaisRegulatorios('Licuadora 600w 3 Velocidades', 'MLM').map((r) => r.orgao), ['NOM']);
+  assert.deepEqual(sinaisRegulatorios('Vapeador Desechable 5000', 'MLM').map((r) => r.orgao), ['Proibido']);
+  assert.deepEqual(sinaisRegulatorios('Funda Para Celular Bluetooth', 'MLM').map((r) => r.orgao), ['Telecom (MX)'], 'acessorio so escapa das regras de inicio de nome');
+  assert.deepEqual(sinaisRegulatorios('Fone Bluetooth Sem Fio').map((r) => r.orgao), ['Anatel'], 'o Brasil continua com as regras dele');
+});
+
+test('cambio guarda o peso mexicano pela conversao do Mercado Livre', async () => {
+  const fs2 = require('node:fs');
+  const path2 = require('node:path');
+  const arquivo = path2.join(path2.dirname(process.env.CONECTA_HUB_SAIDA), 'cambio.json');
+  fs2.rmSync(arquivo, { force: true });
+  const { atualizarCambio } = require('../server/cambio');
+  const r = await atualizarCambio(
+    async () => ({ ok: true, json: async () => ({ value: [{ cotacaoCompra: 5.01, cotacaoVenda: 5.02, dataHoraCotacao: '2026-10-21 13:08:00' }] }) }),
+    async () => ({ rate: 0.2722, creation_date: '2026-10-21T14:11:12.000+00:00' }),
+  );
+  assert.equal(r.venda, 5.02);
+  assert.equal(r.mxn.venda, 0.2722);
+  assert.equal(r.mxn.cotado_em, '2026-10-21 14:11');
+});

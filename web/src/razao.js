@@ -143,8 +143,8 @@ function abaAlibaba(linhas, ncmPorProduto, cambio) {
 
 // Colunas do composto, por nome, para as formulas nao dependerem de posicao.
 const COMPOSTO = [
-  ['num', '#', 5, 'inteiro'], ['codigo', 'Código', 15], ['produto', 'Produto no Mercado Livre', 50], ['categoria', 'Categoria', 30],
-  ['mlPreco', 'ML: menor preço (R$)', 13, 'reais'], ['mlPosicao', 'ML: posição', 9, 'inteiro'], ['mlVendas', 'ML: vendas est. (un.)', 12, 'inteiro'],
+  ['num', '#', 5, 'inteiro'], ['codigo', 'Código', 15], ['pais', 'País', 10], ['produto', 'Produto no Mercado Livre', 50], ['categoria', 'Categoria', 30],
+  ['mlPrecoLocal', 'ML: menor preço (moeda local)', 13, 'decimal2'], ['moeda', 'Moeda', 8], ['mlPreco', 'ML: menor preço (R$)', 13, 'reais'], ['mlPosicao', 'ML: posição', 9, 'inteiro'], ['mlVendas', 'ML: vendas est. (un.)', 12, 'inteiro'],
   ['ncm', 'NCM sugerida', 16], ['anuncio', 'Alibaba: anúncio', 44], ['fornecedor', 'Alibaba: fornecedor', 30],
   ['usdMin', 'Alibaba: preço mín. (US$)', 13, 'dolar'], ['usdMax', 'Alibaba: preço máx. (US$)', 13, 'dolar'], ['moqTexto', 'Alibaba: MOQ', 14],
   ['moq', 'MOQ (quantidade)', 11, 'inteiro'], ['aderencia', 'Alibaba: aderência', 10, 'inteiro'], ['cruzamento', 'Alibaba: cruzamento', 18],
@@ -152,15 +152,19 @@ const COMPOSTO = [
   ['investimento', 'Investimento no MOQ (R$)', 15, 'reais'], ['shopee', 'Shopee: produto parecido', 44], ['shopeePreco', 'Shopee: preço (R$)', 12, 'reais'],
   ['shopeeVendas', 'Shopee: vendas est. 30 dias', 13, 'inteiro'], ['diferenca', 'ML menos Shopee (R$)', 13, 'reais'],
   ['amazon', 'Amazon: produto parecido', 44], ['amazonPreco', 'Amazon: preço (R$)', 12, 'reais'], ['amazonRanking', 'Amazon: ranking de vendas', 12, 'inteiro'],
-  ['diferencaAmazon', 'ML menos Amazon (R$)', 13, 'reais'], ['decisao', 'Decisão', 13], ['observacoes', 'Observações', 36],
+  ['diferencaAmazon', 'ML menos Amazon (R$)', 13, 'reais'],
+  ['joompro', 'JoomPro: produto parecido', 40], ['joomproCusto', 'JoomPro: custo no Brasil (R$)', 13, 'reais'], ['joomproMoq', 'JoomPro: pedido mínimo', 11, 'inteiro'],
+  ['joomproSemelhanca', 'JoomPro: semelhança', 10, 'decimal2'], ['decisao', 'Decisão', 13], ['observacoes', 'Observações', 36],
 ];
 const COL = Object.fromEntries(COMPOSTO.map(([id], i) => [id, letra(i)]));
 const INDICE = Object.fromEntries(COMPOSTO.map(([id], i) => [id, i]));
 
 // Celulas de premissa no painel (coluna C).
-const PREMISSA = { dolar: 'Painel!$C$5', adicionais: 'Painel!$C$6', comissao: 'Painel!$C$7' };
+const PREMISSA = { dolar: 'Painel!$C$5', adicionais: 'Painel!$C$6', comissao: 'Painel!$C$7', peso: 'Painel!$C$8' };
 
-function abaComposta(linhas, produtos, shopee, cambio, amazon) {
+function abaComposta(linhas, produtos, shopee, cambio, amazon, joompro) {
+  // O JoomPro traz um par no Mercado Livre por produto: liga pelo codigo MLB.
+  const noJoompro = new Map(((joompro && joompro.itens) || []).filter((j) => j.mercado_livre && j.mercado_livre.id).map((j) => [j.mercado_livre.id, j]));
   const porId = new Map(produtos.map((p) => [p.id, p]));
   const naAmazon = new Map(((amazon && amazon.itens) || []).filter((i) => i.amazon).map((i) => [i.produto_id, i.amazon]));
   const dados = linhas.map((l, i) => {
@@ -170,12 +174,18 @@ function abaComposta(linhas, produtos, shopee, cambio, amazon) {
     const faixa = faixaDePreco(c.preco);
     const s = parecidoNaShopee(l.produto.nome, shopee);
     const a = naAmazon.get(l.produto.id);
+    const j = noJoompro.get(l.produto.id);
+    const mexico = String(l.produto.id).startsWith('MLM');
     const celula = {
       num: i + 1,
       codigo: l.produto.id,
       produto: link(l.produto.nome, l.produto.link),
       categoria: ml.categoria || l.categoria || '',
-      mlPreco: ml.menor_preco,
+      pais: mexico ? 'México' : 'Brasil',
+      mlPrecoLocal: ml.menor_preco,
+      moeda: mexico ? 'MXN' : 'BRL',
+      // Em reais: o peso mexicano e convertido pela premissa do painel.
+      mlPreco: { formula: `IF(${COL.mlPrecoLocal}${r}="","",IF(${COL.moeda}${r}="MXN",IF(${PREMISSA.peso}=0,"",${COL.mlPrecoLocal}${r}*${PREMISSA.peso}),${COL.mlPrecoLocal}${r}))` },
       mlPosicao: ml.posicao,
       mlVendas: ml.vendas_estimadas,
       ncm: ml.ncm || '',
@@ -199,6 +209,10 @@ function abaComposta(linhas, produtos, shopee, cambio, amazon) {
       amazon: a ? link(a.titulo, a.link) : '',
       amazonPreco: a && a.moeda === 'BRL' ? a.preco : undefined,
       amazonRanking: a ? a.ranking_de_vendas : undefined,
+      joompro: j ? link(j.titulo || j.id, j.link) : '',
+      joomproCusto: j ? j.custo_no_brasil : undefined,
+      joomproMoq: j ? j.pedido_minimo : undefined,
+      joomproSemelhanca: j ? j.semelhanca : undefined,
       diferencaAmazon: { formula: `IF(OR(${COL.mlPreco}${r}="",${COL.amazonPreco}${r}=""),"",${COL.mlPreco}${r}-${COL.amazonPreco}${r})` },
       decisao: '',
       observacoes: '',
@@ -244,12 +258,16 @@ function abaPainel(quantas, cambio) {
         'Frete, seguro, impostos e despesas de importação, como percentual do preço do fornecedor. Começa em zero de propósito: preencha com o número do seu despachante.'),
       linha('Comissão e taxas do marketplace (%)', { v: 0, estilo: 'entrada' }, 'percentual',
         'Percentual do preço de venda que fica com o marketplace. Começa em zero: preencha com a taxa do seu anúncio.'),
+      linha('Peso mexicano (R$)', { v: cambio && cambio.mxn && cambio.mxn.venda > 0 ? cambio.mxn.venda : 0, estilo: 'entrada' }, 'cambio',
+        cambio && cambio.mxn && cambio.mxn.venda > 0 ? `${cambio.mxn.fonte}, cotação de ${cambio.mxn.cotado_em}. Converte os preços do Mercado Libre México para reais.` : 'Sem cotação disponível ao gerar: preencha para converter os preços do México.'),
       [],
       titulo('Resumo'),
       linha('Produtos no razão', f(`COUNTA(${faixa('codigo')})`), 'inteiro'),
       linha('Com fornecedor no Alibaba', f(`COUNT(${faixa('usdMin')})`), 'inteiro'),
       linha('Sem candidato', f(`COUNTIF(${faixa('anuncio')},"Sem candidato")`), 'inteiro'),
       linha('Com produto parecido na Shopee', f(`COUNT(${faixa('shopeePreco')})`), 'inteiro', 'A Shopee entra por semelhança de nome; confira cada par.'),
+      linha('Produtos do México', f(`COUNTIF(${faixa('pais')},"México")`), 'inteiro', 'Preço convertido para reais pela premissa do peso mexicano.'),
+      linha('Com par no JoomPro', f(`COUNT(${faixa('joomproCusto')})`), 'inteiro', 'O par do JoomPro é automático; confira se é o mesmo produto.'),
       linha('Com produto parecido na Amazon', f(`COUNT(${faixa('amazonPreco')})`), 'inteiro', 'Primeiro resultado da busca pelo nome na Amazon; confira cada par.'),
       linha('Aderência média (Accio)', f(`IFERROR(AVERAGE(${faixa('aderencia')}),"")`), 'decimal', 'Nota de 0 a 100 dada pelo Accio para a semelhança entre o candidato e o produto.'),
       linha('Menor preço médio no Mercado Livre (R$)', f(`IFERROR(AVERAGE(${faixa('mlPreco')}),"")`), 'reais'),
@@ -284,6 +302,8 @@ function abaSobre(tipo, dados) {
   notas.push(
     ['Mercado Livre', 'A API informa posição no ranking, não quantidade vendida. Vendas, avaliações e nota são estimativas do JoomPulse, quando registradas.'],
     ['Shopee', 'Vendas e faturamento são estimativas do JoomPulse a partir do contador público arredondado da Shopee; não são vendas reais.'],
+    ['México', 'Produtos do Mercado Libre México têm o preço na moeda local (pesos) e em reais, pela premissa do peso mexicano no painel. A triagem do México usa marcas locais e alertas de COFEPRIS, NOM e homologação de telecom.'],
+    ['JoomPro', 'Custo posto no Brasil no menor preço entre as faixas de quantidade, com o par no Mercado Livre feito automaticamente pelo JoomPulse. Só cerca de um par em três com semelhança de 0,90 ou mais é o mesmo produto: confira.'],
     ['Amazon', 'Primeiro resultado da busca pelo nome do produto na Amazon (Creators API oficial). Ranking de vendas é a posição na categoria da Amazon, não quantidade vendida. Confira se é o mesmo item.'],
     ['Alibaba', 'Preço e MOQ são os do anúncio, em dólares. Não é cotação FOB: frete, impostos e condições só saem com pedido ao fornecedor.'],
     ['Conversão para reais', dados.cambio && dados.cambio.venda ? `Dólar a R$ ${dados.cambio.venda.toFixed(4).replace('.', ',')} (${dados.cambio.fonte}, cotação de ${dados.cambio.cotado_em}).` : 'Sem cotação do dólar disponível ao gerar.'],
@@ -303,9 +323,7 @@ export function montarRazao(tipo, entrada) {
   const shopee = entrada.shopee || [];
   // Para achar o parecido, valem tambem os itens buscados pelo nome dos produtos cotados.
   const paraCasar = shopee.concat(entrada.relacionados || []);
-  // O composto compara precos em reais: por ora so entram produtos do Mercado Livre Brasil.
-  const linhas = (entrada.cotacoes || []).flatMap((c) => (c.linhas || []).map((l) => ({ ...l, categoria: c.categoria })))
-    .filter((l) => !String(l.produto.id).startsWith('MLM'));
+  const linhas = (entrada.cotacoes || []).flatMap((c) => (c.linhas || []).map((l) => ({ ...l, categoria: c.categoria })));
   const ncm = new Map(produtos.filter((p) => p.ncm).map((p) => [p.id, p.ncm]));
   const cambio = entrada.cambio || null;
   const dados = { produtos, shopee, linhas, cambio };
@@ -314,7 +332,7 @@ export function montarRazao(tipo, entrada) {
   if (!rotulo) throw new Error(`tipo de razão desconhecido: ${tipo}`);
   let abas;
   if (tipo === 'composto') {
-    abas = [abaPainel(linhas.length, cambio), abaComposta(linhas, produtos, paraCasar, cambio, entrada.amazon), abaMercadoLivre(produtos), abaAlibaba(linhas, ncm, cambio), abaShopee(shopee)];
+    abas = [abaPainel(linhas.length, cambio), abaComposta(linhas, produtos, paraCasar, cambio, entrada.amazon, entrada.joompro), abaMercadoLivre(produtos), abaAlibaba(linhas, ncm, cambio), abaShopee(shopee)];
   } else if (tipo === 'mercado-livre') abas = [abaMercadoLivre(produtos)];
   else if (tipo === 'shopee') abas = [abaShopee(shopee)];
   else abas = [abaAlibaba(linhas, ncm, cambio)];

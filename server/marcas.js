@@ -43,6 +43,17 @@ const MARCAS_CONHECIDAS = [
   'stanley', 'tramontina', 'coleman', 'nautika', 'intex', 'bestway', 'caloi', 'shimano',
   // pet e alimentos
   'pedigree', 'whiskas', 'royal canin', 'golden', 'premier', 'purina', 'nestle', 'nescafe', 'pilao', '3 coracoes',
+  // Mexico: limpeza, casa e cozinha
+  'pinol', 'fabuloso', 'cloralex', 'suavitel', 'roma', 'foca', 'zote', 'ace', 'salvo', 'axion', 'vel rosita', 'ensueno',
+  'mabe', 'vasconia', 'ekco', 't-fal', 'tfal', 'taurus', 'koblenz', 'hamilton beach', 'ninja', 'cuisinart', 'kitchenaid',
+  'whirlpool', 'frigidaire', 'rubbermaid', 'rotoplas', 'helvex', 'coflex', 'interceramic', 'comex', 'berel', 'cinsa', 'hogar',
+  // Mexico: ferramentas, eletricos e eletronicos
+  'truper', 'pretul', 'urrea', 'surtek', 'hermex', 'volteck', 'fiero', 'foset', 'steren', 'ghia', 'lanix', 'vorago',
+  'perfect choice', 'italika', 'kenworth', 'gonher',
+  // Mexico: alimentos, higiene, papelaria e moda
+  'bimbo', 'maseca', 'la costena', 'herdez', 'jumex', 'lala', 'sabritas', 'gamesa', 'barcel', 'marinela', 'sanborns',
+  'genomma', 'asepxia', 'teatrical', 'pomada de la campana', 'bic', 'scribe', 'barrilito', 'pelikan', 'norma', 'crayola',
+  'andrea', 'flexi', 'price shoes', 'charly', 'pirma', 'totto', 'distroller',
 ];
 
 function norm(s) {

@@ -34,11 +34,23 @@ function cambioGuardado() {
 
 const dataBr = (d) => `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${d.getFullYear()}`;
 
+// O PTAX nao cota o peso mexicano. Para ele vale a conversao oficial do
+// proprio Mercado Livre (/currency_conversions), a mesma que o site usa.
+async function pesoMexicano(consultar) {
+  try {
+    const r = await (consultar || require('./meli').apiGet)('/currency_conversions/search?from=MXN&to=BRL');
+    if (!r || typeof r.rate !== 'number' || !(r.rate > 0)) return null;
+    return { venda: r.rate, cotado_em: String(r.creation_date || '').slice(0, 16).replace('T', ' '), fonte: 'Mercado Livre, conversao de moedas' };
+  } catch (_) {
+    return null;
+  }
+}
+
 // Busca a cotacao mais recente dos ultimos dez dias (cobre fim de semana e
 // feriado). Nunca derruba quem chamou: sem rede, devolve a que estiver guardada.
-async function atualizarCambio(buscar) {
+async function atualizarCambio(buscar, consultar) {
   const atual = cambioGuardado();
-  if (atual && Date.now() - Date.parse(atual.consultado_em) < VALIDADE_MS) return atual;
+  if (atual && atual.mxn && Date.now() - Date.parse(atual.consultado_em) < VALIDADE_MS) return atual;
   const fim = new Date();
   const inicio = new Date(fim.getTime() - 10 * 86400000);
   const url = `${ORIGEM}/CotacaoDolarPeriodo(dataInicial=@i,dataFinalCotacao=@f)?@i='${dataBr(inicio)}'&@f='${dataBr(fim)}'` +
@@ -49,6 +61,7 @@ async function atualizarCambio(buscar) {
     const linha = ((await res.json()).value || [])[0];
     if (!linha || typeof linha.cotacaoVenda !== 'number' || !(linha.cotacaoVenda > 0)) return atual;
     const novo = {
+      mxn: (await pesoMexicano(consultar)) || (atual && atual.mxn) || null,
       moeda: 'USD',
       venda: linha.cotacaoVenda,
       compra: linha.cotacaoCompra,

@@ -14,12 +14,16 @@ for (const p of pacotes.filter((x) => x.sourcing)) {
 }
 const shopee = await api('/api/shopee');
 const cambio = await api('/api/cambio');
+const amazon = await api('/api/amazon');
+const joompro = await api('/api/joompro');
 const razao = montarRazao(tipo, {
   produtos: (await api('/api/produtos')).itens,
   shopee: shopee.itens,
   relacionados: shopee.relacionados || [],
   cotacoes,
   cambio: cambio && cambio.venda > 0 ? cambio : null,
+  amazon: amazon.comparacao,
+  joompro,
 });
 const arquivo = path.join(pasta, razao.arquivo);
 await montarLivro(ExcelJS, razao).xlsx.writeFile(arquivo);

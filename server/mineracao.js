@@ -74,18 +74,47 @@ const REGRAS_REGULATORIAS = [
   },
 ];
 
+// Mexico: os mesmos tipos de produto, com os orgaos e as normas de la.
+// "Homologacao de telecom" cobre o orgao regulador de telecomunicacoes do
+// Mexico (antes IFT); a NOM e a Norma Oficial Mexicana de seguranca e
+// rotulagem. Como no Brasil, e aviso de triagem, nao classificacao.
+const REGRAS_MEXICO = [
+  {
+    orgao: 'Proibido',
+    motivo: 'venda proibida ou restrita no Mexico',
+    re: /cigarro electronico|cigarrillo electronico|\bvape\b|\bvaper\b|\bpod desechable|vapeador|anabolico|esteroide|\bsarms?\b|peptido/,
+  },
+  {
+    orgao: 'Telecom (MX)',
+    motivo: 'emite radiofrecuencia; exige homologacion de telecomunicaciones en Mexico',
+    re: /bluetooth|wi-?fi|wireless|inalambric[oa]|^celular\b|smartphone|\btelefono\b|cargador|power ?bank|router|repetidor|radio(s)? (de )?comunicacion|walkie|smartwatch|reloj inteligente|\bdron\b|\btws\b|monitor de bebe/,
+  },
+  {
+    orgao: 'COFEPRIS',
+    motivo: 'producto de salud, cosmetico, suplemento, alimento o de limpieza; puede exigir registro o aviso ante COFEPRIS',
+    soNoInicio: true,
+    re: /suplemento|vitamina|proteina|whey|creatina|cosmetic|crema|serum|protector solar|bloqueador|medicamento|shampoo|acondicionador|perfume|maquillaje|esmalte|termometro|oximetro|baumanometro|glucometro|masajeador|lentes de contacto|condon|preservativo|repelente|cloro|blanqueador|detergente|desinfectante|suavizante|jabon|insecticida|aromatizante/,
+  },
+  {
+    orgao: 'NOM',
+    motivo: 'certificacion o etiquetado NOM probable (seguridad electrica, juguetes, textiles)',
+    soNoInicio: true,
+    re: /juguete|muneca|casco|silla para auto|cuna|carriola|chupon|mamila|biberon|olla de presion|ventilador|freidora|licuadora|plancha|secadora de cabello|alaciadora|foco|bombilla|extension electrica|multicontacto|encendedor|llanta|colchon|regadera|cafetera|sandwichera|batidora|aspiradora|calentador|microondas|\bhorno\b|\bparrilla\b|\belectric[oa]s?\b|reflector|lampara|tira led/,
+  },
+];
+
 // Acessorio de um produto regulado nao herda a exigencia dele.
-const ACESSORIO = /^(kit \d+ )?(capa|capinha|suporte|pelicula|estojo|bolsa|adesivo)\b/;
+const ACESSORIO = /^(kit \d+ )?(capa|capinha|suporte|pelicula|estojo|bolsa|adesivo|funda|soporte|mica|estuche)\b/;
 const PALAVRAS_NO_INICIO = 6;
 
 // As regras de Anvisa e Inmetro olham so o comeco do nome, onde fica o tipo
 // do produto. O resto do titulo costuma listar usos ("para airfryer", "whey")
 // que nao dizem o que o produto e.
-function sinaisRegulatorios(texto) {
+function sinaisRegulatorios(texto, site) {
   const t = norm(texto);
   const inicio = t.split(/\s+/).slice(0, PALAVRAS_NO_INICIO).join(' ');
   const acessorio = ACESSORIO.test(t);
-  return REGRAS_REGULATORIAS
+  return (site === 'MLM' ? REGRAS_MEXICO : REGRAS_REGULATORIAS)
     .filter((r) => {
       if (acessorio && r.soNoInicio) return false;
       return r.re.test(r.soNoInicio ? inicio : t);
@@ -301,7 +330,7 @@ async function minerarCategoria(raizId, opcoes) {
       marca_conhecida: tipoDeMarca === 'conhecida',
       // So o nome do produto entra: o nome da categoria marcaria tudo dentro
       // de "Celulares e Telefones", ate um jogo de chaves de precisao.
-      regulatorio: sinaisRegulatorios(p.nome),
+      regulatorio: sinaisRegulatorios(p.nome, siteDoId(p.id)),
     };
     p.prioridade = calcularPrioridade(p);
   }

@@ -744,7 +744,7 @@ function Alibaba() {
 
 // Junta as tres fontes; uma que falhe nao impede as outras de sair na planilha.
 async function carregarTudoParaORazao() {
-  const [produtos, shopee, cotacoes, cambio, amazon] = await Promise.allSettled([carregarProdutos(), carregarShopee(), carregarCotacoesCompletas(), carregarCambio(), carregarAmazon()]);
+  const [produtos, shopee, cotacoes, cambio, amazon, joompro] = await Promise.allSettled([carregarProdutos(), carregarShopee(), carregarCotacoesCompletas(), carregarCambio(), carregarAmazon(), carregarJoompro()]);
   const falhas = [];
   if (produtos.status === 'rejected') falhas.push('Mercado Livre');
   if (shopee.status === 'rejected') falhas.push('Shopee');
@@ -756,6 +756,7 @@ async function carregarTudoParaORazao() {
     cotacoes: cotacoes.status === 'fulfilled' ? cotacoes.value : [],
     cambio: cambio.status === 'fulfilled' && cambio.value && cambio.value.venda > 0 ? cambio.value : null,
     amazon: amazon.status === 'fulfilled' ? amazon.value.comparacao : null,
+    joompro: joompro.status === 'fulfilled' ? joompro.value : null,
     falhas,
   };
 }
