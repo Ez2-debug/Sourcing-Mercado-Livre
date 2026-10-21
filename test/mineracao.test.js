@@ -729,6 +729,7 @@ test('cambio guarda o peso mexicano pela conversao do Mercado Livre', async () =
 test('radar: um bloco por mercado, sinais cruzados e Paraguai so com bens de consumo', () => {
   const { montarRadar } = require('../server/radar');
   const r = montarRadar({
+    traducoes: { textos: { Toallero: 'Toalheiro' } },
     produtos: [{ id: 'MLM1', nome: 'Toallero', situacao: 'apto', posicao: 2, categoria: 'Hogar', menor_preco: 164, moeda: 'MXN' }],
     emAlta: [{ id: 'MLB9', nome: 'Mesa Dobravel', posicao: 5, posicao_anterior: 6, categoria: 'Casa' }],
     shopee: { itens: [{ nome: 'Cortina Blackout Sala', tendencia: 'subindo', tem_marca: false, vendas_30_dias: 7000, preco: 31 }] },
@@ -745,8 +746,11 @@ test('radar: um bloco por mercado, sinais cruzados e Paraguai so com bens de con
   const m = Object.fromEntries(r.mercados.map((x) => [x.id, x]));
   assert.equal(m.brasil.produtos[0].sinal, 'subiu de 6º para 5º');
   assert.equal(m.mexico.produtos[0].moeda, 'MXN', 'sem historico no Mexico, entram os aptos do ranking');
+  assert.equal(m.mexico.produtos[0].titulo, 'Toalheiro', 'titulo traduzido');
   assert.deepEqual(m.paraguai.categorias.map((c) => c.codigo), ['71.17'], 'turbina nao e bem de consumo');
-  assert.ok(r.cruzados.some((c) => /air fryer/i.test(c.titulo) && /Brasil, México/.test(c.sinal)));
+  assert.ok(!r.cruzados.some((c) => /^air fryer$/i.test(c.titulo)), 'termo de busca sozinho nao entra');
+  assert.ok(!m.argentina, 'pais so com termos de busca fica de fora');
+  assert.ok(r.mercados.every((x) => !x.termos), 'nenhum bloco traz termos');
   assert.ok(r.cruzados.some((c) => /Cortina Blackout/.test(c.titulo)), 'Shopee em alta que tambem e busca no Mercado Livre');
   assert.equal(m.amazon.pendente, true);
 });
@@ -833,4 +837,16 @@ test('importados: separa China e EUA, tira marca e regulado das oportunidades e 
   assert.equal(p.shopee.descartados_por_leitura_suspeita, 1);
   assert.equal(p.nas_duas_lojas.length, 1);
   assert.match(p.nas_duas_lojas[0].parecido.titulo, /Ultraleve/);
+});
+
+test('traducao: guarda o que traduziu, respeita o limite do dia e nao repete', async () => {
+  const { traduzirPendentes, traduzido } = require('../server/traducao');
+  let chamadas = 0;
+  const buscar = async (url) => { chamadas += 1; const q = decodeURIComponent(new URL(url).searchParams.get('q')); return { ok: true, json: async () => ({ responseStatus: 200, responseData: { translatedText: `PT ${q}` } }) }; };
+  const agora = new Date('2026-10-21T12:00:00Z');
+  assert.equal(await traduzirPendentes(['Juego de llaves', 'Juego de llaves', 'Funda para moto'], 'es', buscar, agora), 2);
+  assert.equal(traduzido('Juego de llaves'), 'PT Juego de llaves');
+  assert.equal(await traduzirPendentes(['Juego de llaves'], 'es', buscar, agora), 0);
+  assert.equal(chamadas, 2, 'o que ja foi traduzido nao vai de novo');
+  assert.equal(await traduzirPendentes(['x'.repeat(390), 'y'.repeat(390)].concat(Array.from({ length: 20 }, (_, i) => `${i}`.repeat(300))), 'es', buscar, agora) < 22, true, 'para no limite diario');
 });

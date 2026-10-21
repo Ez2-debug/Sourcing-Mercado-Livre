@@ -205,11 +205,11 @@ export const compararNaAmazon = () => comando('/api/amazon/comparar');
 export async function carregarRadar() {
   if (!comSupabase) return local('/api/radar');
   const { montarRadar } = await import('./radar.js');
-  const [produtos, shopee, tendencias, joompro, paraguai, amazon, aduana, buscas, internacional] = await Promise.all([
+  const [produtos, shopee, tendencias, joompro, paraguai, amazon, aduana, internacional, traducoes] = await Promise.all([
     produtosDoSupabase().catch(() => ({ itens: [] })), retrato('shopee'), retrato('tendencias'), retrato('joompro'), retrato('paraguai'), retrato('amazon'),
-    retrato('aduana-py'), retrato('buscas-google'), retrato('internacional'),
+    retrato('aduana-py'), retrato('internacional'), retrato('traducoes'),
   ]);
-  return montarRadar({ produtos: produtos.itens, emAlta: [], shopee, tendencias, joompro, paraguai, amazon, aduana, buscas, internacional });
+  return montarRadar({ produtos: produtos.itens, emAlta: [], shopee, tendencias, joompro, paraguai, amazon, aduana, internacional, traducoes });
 }
 export const carregarInternacional = () => (comSupabase ? retrato('internacional') : local('/api/internacional'));
 export const carregarTendencias = () => (comSupabase

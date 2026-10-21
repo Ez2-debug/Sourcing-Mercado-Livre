@@ -184,6 +184,8 @@ async function sincronizarRetratos() {
     if (tendencias) linhas.push({ chave: 'tendencias', atualizado_em: agora, dados: tendencias });
     const cambio = require('./cambio').cambioGuardado();
     if (cambio) linhas.push({ chave: 'cambio', atualizado_em: agora, dados: cambio });
+    const traducoes = require('./traducao').lerTraducoes();
+    if (Object.keys(traducoes.textos).length) linhas.push({ chave: 'traducoes', atualizado_em: agora, dados: { textos: traducoes.textos } });
     const internacional = require('./internacional').lerInternacional();
     if (internacional) linhas.push({ chave: 'internacional', atualizado_em: agora, dados: internacional });
     const joompro = require('./joompro').lerJoompro();

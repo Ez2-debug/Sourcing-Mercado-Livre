@@ -1,10 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   Activity, ArrowDownRight, ArrowUpRight, BookOpenText, Bot, CheckCircle2, CircleAlert, ClipboardList, Download, FileSpreadsheet,
-  Factory, Flag, Globe, Headset, Radar as IconeRadar, Sparkles, LayoutDashboard, PackageSearch, RefreshCw, Search, Ship, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
+  Factory, Globe, Headset, Radar as IconeRadar, Sparkles, LayoutDashboard, PackageSearch, RefreshCw, Search, Ship, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
 } from 'lucide-react';
 import {
-  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarAmazon, carregarCambio, carregarIntegracoes, carregarRadar, carregarInternacional, carregarTendencias, carregarJoompro, carregarSuportify, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
+  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarAmazon, carregarCambio, carregarIntegracoes, carregarRadar, carregarInternacional, carregarJoompro, carregarSuportify, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
   carregarShopee, carregarVisaoGeral, comSupabase, comandarMinerador, compararNaAmazon, criarPedido, gerarPlanilhas, supabase,
 } from './fonte.js';
 import { Aviso, Botao, Card, CardTitulo, Carregando, Indicador, Selo, Tabela } from './ui.jsx';
@@ -68,7 +68,7 @@ function Foto({ src, grande }) {
   const ok = fotoSegura(src);
   const classe = grande ? 'h-36 w-full' : 'size-12';
   return ok
-    ? <img className={`${classe} shrink-0 rounded-md border bg-white object-contain`} src={ok} alt="" loading="lazy" />
+    ? <img className={`${classe} shrink-0 rounded-md border bg-white object-contain`} src={ok} alt="" loading="lazy" referrerPolicy="no-referrer" />
     : <div className={`${classe} grid shrink-0 place-items-center rounded-md border bg-muted text-[10px] text-muted-foreground`}>sem foto</div>;
 }
 
@@ -625,36 +625,6 @@ function Importados() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Tendencias por pais                                                 */
-/* ------------------------------------------------------------------ */
-
-function Tendencias() {
-  const { dados: d, erro, carregando } = useDados(carregarTendencias, 0);
-  const paises = d ? Object.entries(d.paises || {}) : [];
-  return (
-    <Card>
-      <CardTitulo
-        titulo="O que se busca no Mercado Livre de cada país"
-        descricao={`Termos mais buscados, na ordem que a API devolve, sem volume de busca${d && d.consultado_em ? `. Leitura de ${hora(d.consultado_em)}.` : '.'} Argentina, Chile e Colômbia só entram por aqui: a credencial não lê o ranking de produtos desses países.`}
-      />
-      <Estado erro={erro} carregando={carregando} dados={d} />
-      {d && !paises.length && <p className="text-sm text-muted-foreground">Ainda sem leitura. Ela é feita a cada mineração.</p>}
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
-        {paises.map(([site, p]) => (
-          <div key={site} className="rounded-lg border p-3">
-            <div className="mb-2 flex items-center gap-2"><Flag className="size-4 text-primary" aria-hidden="true" /><span className="font-semibold">{p.nome}</span><Selo className="ml-auto">{p.termos.length}</Selo></div>
-            <ol className="list-decimal space-y-0.5 pl-5 text-sm">
-              {p.termos.slice(0, 20).map((t) => <li key={t.termo} className="break-words"><Nome nome={t.termo} link={t.link} /></li>)}
-            </ol>
-            {p.erro && <p className="text-xs text-muted-foreground">Não disponível nesta leitura.</p>}
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /* Amazon                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -1105,7 +1075,6 @@ const TODAS_AS_TELAS = [
   ['alta', 'Em alta', TrendingUp, EmAlta, 'Produtos aptos que subiram no ranking do Mercado Livre', 'Visão geral'],
   ['ml', 'Mercado Livre · Brasil', Store, MercadoLivreBrasil, 'Ranking do Mercado Livre Brasil: a demanda que a Compra Internacional atende', 'Marketplaces'],
   ['ml-mx', 'Mercado Libre · México', Store, MercadoLivreMexico, 'Ranking do Mercado Libre México, com preços em pesos', 'Marketplaces'],
-  ['tendencias', 'Tendências por país', Flag, Tendencias, 'Termos mais buscados no Mercado Livre de cada país', 'Marketplaces'],
   ['ml-china', 'ML Internacional · China', Globe, InternacionalChina, 'Mercado Livre, Compra Internacional com envio da China', 'Marketplaces'],
   ['ml-eua', 'ML Internacional · EUA', Globe, InternacionalEua, 'Mercado Livre, Compra Internacional com envio dos Estados Unidos', 'Marketplaces'],
   ['china', 'China (JoomPro)', Ship, China, 'Produtos importáveis da China, com par no Mercado Livre', 'Fornecimento'],

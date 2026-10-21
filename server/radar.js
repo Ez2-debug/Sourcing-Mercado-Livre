@@ -5,9 +5,10 @@
  * sinal, e os sinais que aparecem em mais de um mercado.
  *
  * Junta o que ja e coletado: ranking do Mercado Livre (Brasil e Mexico), a
- * Shopee e o JoomPro pelo JoomPulse, os termos mais buscados de cada pais, as
- * importacoes do Paraguai pela ONU e a Amazon quando houver credencial. Nao
- * cria numero novo: cada item sai com o sinal que a fonte deu.
+ * Shopee e o JoomPro pelo JoomPulse, o que o Brasil compra de fora, as
+ * importacoes do Paraguai (aduana e ONU) e a Amazon quando houver credencial.
+ * So produtos e categorias, em portugues. Nao cria numero novo: cada item sai
+ * com o sinal que a fonte deu.
  */
 
 const { emAltaNasImportacoes } = require('./comtrade');
@@ -43,9 +44,13 @@ function posicaoDaNcm(ncm) {
   return d.length >= 4 ? d.slice(0, 4) : null;
 }
 
-// entrada: { produtos, emAlta, shopee, tendencias, joompro, paraguai, aduana, buscas, amazon, internacional }
+// entrada: { produtos, emAlta, shopee, tendencias, joompro, paraguai, aduana, amazon, internacional, traducoes }
+// So produtos, tudo em portugues: titulo em outra lingua sai traduzido quando
+// ha traducao guardada (traducoes: { textos: { original: portugues } }).
 function montarRadar(entrada) {
   const e = entrada || {};
+  const textos = (e.traducoes && e.traducoes.textos) || {};
+  const tr = (s) => textos[String(s || '').replace(/\s+/g, ' ').trim()] || s;
   const produtos = e.produtos || [];
   const emAlta = e.emAlta || [];
   const termos = (site) => (((e.tendencias || {}).paises || {})[site] || { termos: [] }).termos;
@@ -58,7 +63,6 @@ function montarRadar(entrada) {
   mercados.push({
     id: 'brasil', mercado: 'Brasil · Mercado Livre', fonte: 'API oficial do Mercado Livre',
     produtos: subindoBr.length ? subindoBr : aptos('MLB').map((p) => produtoDoRanking(p, `${p.posicao}º no ranking, apto`)),
-    termos: termos('MLB').slice(0, 10).map((t) => ({ termo: t.termo, link: t.link })),
   });
 
   const shopee = ((e.shopee && e.shopee.itens) || [])
@@ -66,73 +70,63 @@ function montarRadar(entrada) {
     .sort((a, b) => (b.vendas_30_dias || 0) - (a.vendas_30_dias || 0)).slice(0, 8)
     .map((p) => ({ titulo: p.nome, detalhe: p.categoria, link: p.link, foto: p.foto, preco: p.preco, moeda: 'BRL',
       sinal: `vendas subindo; ${(p.vendas_30_dias || 0).toLocaleString('pt-BR')} un. em 30 dias (estimativa JoomPulse)` }));
-  mercados.push({ id: 'shopee', mercado: 'Brasil · Shopee', fonte: 'JoomPulse (estimativas)', produtos: shopee, termos: [] });
+  mercados.push({ id: 'shopee', mercado: 'Brasil · Shopee', fonte: 'JoomPulse (estimativas)', produtos: shopee });
 
-  const subindoMx = emAlta.filter(doSite('MLM')).slice(0, 8).map((p) => produtoDoRanking(p, `subió del ${p.posicao_anterior}º al ${p.posicao}º`));
+  const subindoMx = emAlta.filter(doSite('MLM')).slice(0, 8).map((p) => produtoDoRanking(p, `subiu de ${p.posicao_anterior}º para ${p.posicao}º`));
   mercados.push({
-    id: 'mexico', mercado: 'México · Mercado Libre', fonte: 'API oficial do Mercado Livre',
-    produtos: subindoMx.length ? subindoMx : aptos('MLM').map((p) => produtoDoRanking(p, `${p.posicao}º no ranking, apto`)),
-    termos: termos('MLM').slice(0, 10).map((t) => ({ termo: t.termo, link: t.link })),
+    id: 'mexico', mercado: 'México · Mercado Livre', fonte: 'API oficial do Mercado Livre; títulos traduzidos do espanhol',
+    produtos: (subindoMx.length ? subindoMx : aptos('MLM').map((p) => produtoDoRanking(p, `${p.posicao}º no ranking, apto`)))
+      .map((p) => ({ ...p, titulo: tr(p.titulo), detalhe: tr(p.detalhe) })),
   });
-
-  for (const [site, id, nome] of [['MLA', 'argentina', 'Argentina'], ['MLC', 'chile', 'Chile'], ['MCO', 'colombia', 'Colômbia']]) {
-    mercados.push({
-      id, mercado: `${nome} · Mercado Libre`, fonte: 'Termos mais buscados (API oficial do Mercado Livre)', produtos: [],
-      termos: termos(site).slice(0, 15).map((t) => ({ termo: t.termo, link: t.link })),
-    });
-  }
 
   // Paraguai: compra real pela aduana (mensal, por NCM e mercadoria), tendencia
   // anual pela ONU e o termometro diario das buscas no Google.
   const aduana = e.aduana;
   const pct = (v) => `${v > 0 ? '+' : ''}${Math.round(v * 100)}%`;
   const produtosPy = ((aduana && aduana.subindo) || []).slice(0, 10).map((n) => ({
-    titulo: n.mercadorias && n.mercadorias[0] ? n.mercadorias[0] : n.descricao,
-    detalhe: n.descricao,
+    // Nome da NCM brasileira: a nomenclatura e a mesma do Mercosul.
+    titulo: n.nome_pt || n.descricao,
     codigo: n.ncm,
     valor_usd: n.fob_usd,
     sinal: [`${pct(n.variacao_mes)} contra ${aduana.comparado_com}`, typeof n.variacao_ano === 'number' ? `${pct(n.variacao_ano)} em um ano` : '',
       n.origens && n.origens[0] ? `${Math.round(n.origens[0].participacao * 100)}% de ${n.origens[0].pais}` : ''].filter(Boolean).join(' · '),
   }));
-  const buscasPy = ((((e.buscas || {}).paises || {}).PY || {}).itens || []).slice(0, 15)
-    .map((b) => ({ termo: b.termo, link: b.link, extra: [b.trafego, b.dias_em_alta > 1 ? `${b.dias_em_alta} dias` : ''].filter(Boolean).join(' · ') }));
   const py = emAltaNasImportacoes(e.paraguai, 8);
   mercados.push({
     id: 'paraguai', mercado: 'Paraguai',
-    fonte: [aduana ? `Aduana do Paraguai, ${aduana.mes} contra ${aduana.comparado_com}` : '', e.paraguai ? `ONU ${e.paraguai.ano}` : '', buscasPy.length ? 'buscas do Google hoje' : ''].filter(Boolean).join(' · ') || 'Aduana do Paraguai e ONU',
+    fonte: [aduana ? `Aduana do Paraguai, ${aduana.mes} contra ${aduana.comparado_com}` : '', e.paraguai ? `ONU ${e.paraguai.ano}` : ''].filter(Boolean).join(' · ') || 'Aduana do Paraguai e ONU',
     produtos: produtosPy,
     categorias: py.map((l) => ({ titulo: l.descricao, codigo: l.posicao, sinal: `+${Math.round(l.variacao * 100)}% em ${e.paraguai.ano} (ONU)`, valor_usd: l.valor_usd })),
-    aviso: 'Produtos: importações de consumo liberadas pela aduana no último mês publicado, que mais cresceram. Categorias: crescimento anual pela ONU. Buscas: assuntos do dia no Google, não necessariamente compra.',
-    termos: buscasPy,
-    rotuloDosTermos: 'Buscas em alta hoje no Google',
+    aviso: 'Produtos: importações de consumo liberadas pela aduana no último mês publicado que mais cresceram, com o nome da NCM. Categorias: crescimento anual pela ONU.',
   });
 
   const joompro = ((e.joompro && e.joompro.itens) || []).slice(0, 8).map((j) => ({
-    titulo: j.titulo, detalhe: j.categoria, link: j.link, foto: j.foto, preco: j.custo_no_brasil, moeda: 'BRL',
+    // Titulo do par no Mercado Livre Brasil: o do catalogo vem em ingles.
+    titulo: (j.mercado_livre && j.mercado_livre.titulo) || j.titulo, detalhe: j.mercado_livre && j.mercado_livre.categoria, link: j.link, foto: j.foto, preco: j.custo_no_brasil, moeda: 'BRL',
     sinal: `custo posto no Brasil a partir de ${j.pedido_minimo || '?'} un.; par no ML com semelhança ${typeof j.semelhanca === 'number' ? j.semelhanca.toFixed(2) : '?'}`,
   }));
-  mercados.push({ id: 'china', mercado: 'China · JoomPro (fornecimento)', fonte: 'JoomPulse, catálogo JoomPro', produtos: joompro, termos: [] });
+  mercados.push({ id: 'china', mercado: 'China · JoomPro (fornecimento)', fonte: 'JoomPulse, catálogo JoomPro; título do par no Mercado Livre', produtos: joompro });
 
   // O que o Brasil compra de fora: Compra Internacional do Mercado Livre por
   // pais da loja e lojas internacionais da Shopee (estimativas do JoomPulse).
   const intl = e.internacional;
   const lista = (l, n) => ((l || []).slice(0, n)).map((p) => ({ titulo: p.titulo, detalhe: p.detalhe, link: p.link, foto: p.foto, preco: p.preco, moeda: p.moeda, sinal: p.sinal }));
   mercados.push({ id: 'importado-china', mercado: 'Brasil compra da China · Mercado Livre', fonte: 'JoomPulse, Compra Internacional (estimativas)',
-    produtos: lista(intl && intl.china && intl.china.oportunidades, 8), termos: [],
+    produtos: lista(intl && intl.china && intl.china.oportunidades, 8).map((p) => ({ ...p, titulo: tr(p.titulo) })),
     aviso: 'Sem marca de terceiros e sem órgão regulador no caminho. Pedidos por mês são estimativas do JoomPulse.' });
   mercados.push({ id: 'importado-eua', mercado: 'Brasil compra dos EUA · Mercado Livre', fonte: 'JoomPulse, Compra Internacional (estimativas)',
-    produtos: lista(intl && intl.eua && (intl.eua.oportunidades.length ? intl.eua.oportunidades : intl.eua.referencia_de_marca), 8), termos: [],
+    produtos: lista(intl && intl.eua && (intl.eua.oportunidades.length ? intl.eua.oportunidades : intl.eua.referencia_de_marca), 8).map((p) => ({ ...p, titulo: tr(p.titulo) })),
     aviso: 'Dos EUA o Brasil compra sobretudo marca (games, áudio, suplementos). Marca de terceiros exige autorização para revender.' });
   mercados.push({ id: 'importado-shopee', mercado: 'Brasil compra de fora · Shopee', fonte: 'JoomPulse, lojas internacionais (estimativas)',
-    produtos: lista(intl && intl.shopee && intl.shopee.oportunidades, 8), termos: [] });
+    produtos: lista(intl && intl.shopee && intl.shopee.oportunidades, 8) });
 
   const amazon = ((e.amazon && e.amazon.itens) || []).filter((i) => i.amazon && i.amazon.ranking_de_vendas).sort((a, b) => a.amazon.ranking_de_vendas - b.amazon.ranking_de_vendas)
     .slice(0, 8).map((i) => ({ titulo: i.amazon.titulo, link: i.amazon.link, foto: i.amazon.foto, preco: i.amazon.preco, moeda: i.amazon.moeda, sinal: `${i.amazon.ranking_de_vendas}º no ranking de vendas da Amazon` }));
-  mercados.push({ id: 'amazon', mercado: 'Amazon', fonte: 'Creators API oficial', produtos: amazon, termos: [], pendente: !e.amazon });
+  mercados.push({ id: 'amazon', mercado: 'Amazon', fonte: 'Creators API oficial', produtos: amazon, pendente: !e.amazon });
 
-  // Sinais em mais de um mercado: buscas repetidas entre paises e produtos da
-  // Shopee em alta que tambem aparecem nas buscas do Brasil.
-  const cruzados = termosEmVariosPaises(e.tendencias).slice(0, 10).map((t) => ({ titulo: t.termo, sinal: `buscado em ${t.paises.join(', ')}` }));
+  // Produtos em mais de um mercado: Shopee em alta que tambem e busca no
+  // Brasil, o que se vende de fora nas duas lojas e o que cresce no Paraguai.
+  const cruzados = [];
   const buscasBr = termos('MLB').map((t) => palavras(t.termo)).filter((p) => p.length);
   for (const s of shopee) {
     const nome = new Set(palavras(s.titulo));
@@ -155,7 +149,7 @@ function montarRadar(entrada) {
 
   return {
     gerado_em: new Date().toISOString(),
-    aviso: 'Cada sinal vem da fonte indicada. Posição em ranking e termo de busca não são quantidade vendida; vendas da Shopee são estimativas do JoomPulse.',
+    aviso: 'Cada sinal vem da fonte indicada. Posição em ranking não é quantidade vendida; vendas e pedidos são estimativas do JoomPulse.',
     cruzados,
     mercados,
   };

@@ -45,6 +45,7 @@ const { montarRadar } = require('./server/radar');
 const { atualizarAduana, tendenciasDaAduana } = require('./server/aduanapy');
 const { atualizarBuscas, lerBuscas } = require('./server/buscasgoogle');
 const { lerInternacional } = require('./server/internacional');
+const { lerTraducoes, traduzirPendentes } = require('./server/traducao');
 const { siteDoId } = require('./server/meli');
 const { sincronizarRetratos } = require('./server/supabase');
 const { TIPOS, criarPedido, lerPedidos } = require('./server/pedidos');
@@ -408,6 +409,24 @@ function produtosCotados() {
   return [...vistos.values()];
 }
 
+// Titulos do radar em espanhol (Mexico e alguns anuncios internacionais):
+// traduz em segundo plano, dentro do limite diario, e refaz o radar.
+let traduzindo = false;
+function traduzirRadar(r) {
+  if (traduzindo) return;
+  // Mexico: tudo em espanhol. Nos anuncios internacionais, so o que parece espanhol.
+  const espanhol = /[ñ¿¡]|\b(los|las|del|con|juego|llave|linterna|recargable|herramientas|juguetes)\b/i;
+  const emEspanhol = r.mercados.flatMap((m) => {
+    if (m.id === 'mexico') return m.produtos.flatMap((p) => [p.titulo, p.detalhe]);
+    if (m.id === 'importado-china' || m.id === 'importado-eua') return m.produtos.map((p) => p.titulo).filter((t) => espanhol.test(t));
+    return [];
+  }).filter(Boolean);
+  if (!emEspanhol.length) return;
+  traduzindo = true;
+  traduzirPendentes(emEspanhol, 'es').then((feitos) => { if (feitos) radarGuardado = null; })
+    .catch((err) => log(`traducao: ${err.message}`)).finally(() => { traduzindo = false; });
+}
+
 // Radar de tendencias com o que ja foi coletado. Guardado ate a proxima mineracao.
 let radarGuardado = null;
 function radar() {
@@ -423,7 +442,9 @@ function radar() {
     buscas: lerBuscas(),
     amazon: amazon.lerComparacao(),
     internacional: lerInternacional(),
+    traducoes: lerTraducoes(),
   });
+  traduzirRadar(radarGuardado);
   return radarGuardado;
 }
 

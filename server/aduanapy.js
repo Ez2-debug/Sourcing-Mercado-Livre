@@ -20,6 +20,7 @@ const { Readable } = require('node:stream');
 
 const { cleanEnv, log } = require('./meli');
 const { eDeConsumo } = require('./comtrade');
+const { nomeDaNcm } = require('./ncm');
 
 const ORIGEM = 'https://datosabiertos.aduana.gov.py/all_data';
 const MESES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
@@ -185,6 +186,7 @@ function tendenciasDaAduana(hoje) {
   const comBase = (mapa, ncm) => { const b = mapa.get(ncm); return b && b.fob_usd >= BASE_MINIMA ? b : undefined; };
   const linhas = atual.ncm.filter((n) => n.fob_usd >= FOB_MINIMO_TENDENCIA && !eIndustrial(n.ncm)).map((n) => ({
     ...n,
+    nome_pt: nomeDaNcm(n.ncm) || undefined,
     variacao_mes: variacao(n.fob_usd, comBase(antes, n.ncm)),
     variacao_ano: variacao(n.fob_usd, comBase(ano, n.ncm)),
     aumento_usd: comBase(antes, n.ncm) ? n.fob_usd - antes.get(n.ncm).fob_usd : undefined,

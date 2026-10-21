@@ -191,4 +191,23 @@ async function anotarNcm(produtos) {
   return { disponivel: true, vigencia: t.vigencia, ato: t.ato, produtos_com_sugestao: com };
 }
 
-module.exports = { anotarNcm, carregarTabela, sugerirNcm };
+// Nome em portugues de um codigo da NCM (a mesma do Mercosul), sem baixar
+// nada: usa a tabela ja carregada ou o cache em disco. Junta a posicao com o
+// item quando o item diz algo ("Motocicletas - De cilindrada superior a 125 cm3").
+function nomeDaNcm(codigo) {
+  const d = String(codigo || '').replace(/\D/g, '');
+  if (d.length < 4) return '';
+  let t = tabela;
+  if (!t) {
+    try { t = tabela = indexar(JSON.parse(fs.readFileSync(arquivoCache(), 'utf8'))); } catch (_) { return ''; }
+  }
+  const curto = (s) => String(s || '').replace(/<[^>]+>/g, '').split(/[;(:]/)[0].replace(/\s+/g, ' ').replace(/[.,]$/, '').trim();
+  const posicao = curto(t.porDigitos.get(d.slice(0, 4)) || descricaoDe(t, d.slice(0, 4))).split(/,| que | incluindo | mesmo | com exclusão /)[0].trim();
+  const partes = caminho(t, d).slice(1).map(curto).filter((p) => p && !/^outr[oa]s?$/i.test(p) && p !== posicao);
+  const item = partes[partes.length - 1];
+  // "Motocicletas" + "Motocicletas de cilindrada..." fica so o item.
+  if (item && item.toLowerCase().startsWith(posicao.toLowerCase())) return item;
+  return [posicao, item].filter(Boolean).join(' - ');
+}
+
+module.exports = { anotarNcm, carregarTabela, nomeDaNcm, sugerirNcm };
