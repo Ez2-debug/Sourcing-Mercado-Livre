@@ -149,7 +149,9 @@ async function retrato(chave) {
 
 // Produtos das mineracoes das ultimas 36 horas, a mais recente de cada categoria.
 async function produtosDoSupabase() {
-  const desde = new Date(Date.now() - 36 * 3600 * 1000).toISOString();
+  // A mineracao mais recente de cada categoria nos ultimos 30 dias: a fila gira
+  // uma categoria por vez, entao uma janela curta deixa o site quase vazio.
+  const desde = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
   const mineracoes = conferir(await supabase.from('chs_mineracoes').select('id, categoria_id, consultado_em')
     .gte('consultado_em', desde).order('consultado_em', { ascending: false }).limit(200));
   const vistas = new Set();
