@@ -1,11 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   Activity, ArrowDownRight, ArrowUpRight, BookOpenText, Bot, CheckCircle2, CircleAlert, ClipboardList, Download, FileSpreadsheet,
-  Factory, Globe, Headset, LayoutDashboard, Search, Ship, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
+  Factory, Globe, Headset, LayoutDashboard, PackageSearch, RefreshCw, Search, Ship, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
 } from 'lucide-react';
 import {
-  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarCambio, carregarIntegracoes, carregarJoompro, carregarSuportify, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
-  carregarShopee, carregarVisaoGeral, comSupabase, comandarMinerador, criarPedido, gerarPlanilhas, supabase,
+  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarAmazon, carregarCambio, carregarIntegracoes, carregarJoompro, carregarSuportify, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
+  carregarShopee, carregarVisaoGeral, comSupabase, comandarMinerador, compararNaAmazon, criarPedido, gerarPlanilhas, supabase,
 } from './fonte.js';
 import { Aviso, Botao, Card, CardTitulo, Carregando, Indicador, Selo, Tabela } from './ui.jsx';
 import { TIPOS_DE_RAZAO, faixaDePreco, montarRazao } from './razao.js';
@@ -27,7 +27,7 @@ function hora(iso) {
 }
 
 // Fotos e links vem de fora: so entram na pagina os enderecos esperados.
-const CDNS = /^https:\/\/[a-z0-9.-]+\.(mlstatic\.com|susercontent\.com|alicdn\.com|joomprocdn\.net)\//i;
+const CDNS = /^https:\/\/[a-z0-9.-]+\.(mlstatic\.com|susercontent\.com|alicdn\.com|joomprocdn\.net|media-amazon\.com|ssl-images-amazon\.com)\//i;
 const fotoSegura = (u) => (typeof u === 'string' && CDNS.test(u) ? u : null);
 const linkSeguro = (u) => (typeof u === 'string' && /^https:\/\//i.test(u) ? u : null);
 
@@ -460,6 +460,58 @@ function China() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Amazon                                                              */
+/* ------------------------------------------------------------------ */
+
+function Amazon() {
+  const { dados: d, erro, carregando, recarregar } = useDados(carregarAmazon, 0);
+  const [situacao, setSituacao] = useState(null);
+  const casa = useBusca();
+  const atualizar = () => {
+    setSituacao('Buscando na Amazon, um produto por segundo. Pode levar um minuto.');
+    compararNaAmazon().then((r) => { setSituacao(`${r.com_resultado} de ${r.itens} produtos encontrados na Amazon.`); recarregar(); }, (e) => setSituacao(e.message));
+  };
+  const c = d && d.comparacao;
+  const itens = c ? c.itens.filter((i) => casa(i.produto, i.amazon && i.amazon.titulo)) : [];
+  return (
+    <Card>
+      <CardTitulo
+        titulo="Comparação com a Amazon"
+        descricao={c
+          ? `Busca de ${hora(c.consultado_em)} em ${c.marketplace}, pela Creators API oficial. O par é o primeiro resultado da busca pelo nome: confira se é o mesmo item.`
+          : 'Cada produto já cotado no Alibaba é buscado na Amazon pelo nome, para comparar preço e ver a posição no ranking de vendas da Amazon.'}
+        acao={!comSupabase && d && d.configurada && <Botao variante="primario" onClick={atualizar}><RefreshCw className="size-4" />Atualizar comparação</Botao>}
+      />
+      <Estado erro={erro} carregando={carregando} dados={d} />
+      {situacao && <p className="mb-3 text-sm text-muted-foreground">{situacao}</p>}
+      {d && !d.configurada && !comSupabase && (
+        <div className="rounded-md bg-warning-soft p-4 text-sm text-warning">
+          <p className="font-semibold">A Amazon ainda não está ligada.</p>
+          <p className="mt-1">A integração usa a Creators API oficial, que exige conta no programa de Associados da Amazon e credenciais da API. Com elas em mãos, crie no Windows as variáveis de usuário <code>AMAZON_CREDENTIAL_ID</code>, <code>AMAZON_CREDENTIAL_SECRET</code> e <code>AMAZON_PARTNER_TAG</code> e reinicie o minerador.</p>
+        </div>
+      )}
+      {c && (
+        <Tabela colunas={[{ titulo: 'Produto cotado (Mercado Livre)' }, { titulo: 'Na Amazon' }, { titulo: 'Preço', num: true }, { titulo: 'Ranking de vendas', num: true }]}
+          vazio={!itens.length && 'Nenhum produto nesta comparação.'}>
+          {itens.map((i) => (
+            <tr key={i.produto_id}>
+              <td className="min-w-56 text-sm"><div className="break-words font-medium">{i.produto}</div><div className="text-xs text-muted-foreground">{i.produto_id}</div></td>
+              <td className="min-w-64">
+                {i.amazon
+                  ? <div className="flex items-center gap-3"><Foto src={i.amazon.foto} /><div className="min-w-0 break-words"><Nome nome={i.amazon.titulo || i.amazon.asin} link={i.amazon.link} /><div className="text-xs text-muted-foreground">{i.amazon.asin}</div></div></div>
+                  : <span className="text-sm text-muted-foreground">{i.erro || 'Sem resultado'}</span>}
+              </td>
+              <td className="text-right whitespace-nowrap tabular-nums">{i.amazon && i.amazon.moeda === 'BRL' ? reais(i.amazon.preco) : (i.amazon && i.amazon.preco ? `${i.amazon.moeda} ${i.amazon.preco}` : '')}</td>
+              <td className="text-right tabular-nums">{i.amazon && i.amazon.ranking_de_vendas ? `${inteiro(i.amazon.ranking_de_vendas)}º` : ''}</td>
+            </tr>
+          ))}
+        </Tabela>
+      )}
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Shopee                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -657,7 +709,7 @@ function Alibaba() {
 
 // Junta as tres fontes; uma que falhe nao impede as outras de sair na planilha.
 async function carregarTudoParaORazao() {
-  const [produtos, shopee, cotacoes, cambio] = await Promise.allSettled([carregarProdutos(), carregarShopee(), carregarCotacoesCompletas(), carregarCambio()]);
+  const [produtos, shopee, cotacoes, cambio, amazon] = await Promise.allSettled([carregarProdutos(), carregarShopee(), carregarCotacoesCompletas(), carregarCambio(), carregarAmazon()]);
   const falhas = [];
   if (produtos.status === 'rejected') falhas.push('Mercado Livre');
   if (shopee.status === 'rejected') falhas.push('Shopee');
@@ -668,6 +720,7 @@ async function carregarTudoParaORazao() {
     relacionados: shopee.status === 'fulfilled' ? (shopee.value.relacionados || []) : [],
     cotacoes: cotacoes.status === 'fulfilled' ? cotacoes.value : [],
     cambio: cambio.status === 'fulfilled' && cambio.value && cambio.value.venda > 0 ? cambio.value : null,
+    amazon: amazon.status === 'fulfilled' ? amazon.value.comparacao : null,
     falhas,
   };
 }
@@ -856,6 +909,7 @@ const TODAS_AS_TELAS = [
   ['ml-china', 'ML Internacional · China', Globe, InternacionalChina, 'Mercado Livre, Compra Internacional com envio da China', 'Marketplaces'],
   ['ml-eua', 'ML Internacional · EUA', Globe, InternacionalEua, 'Mercado Livre, Compra Internacional com envio dos Estados Unidos', 'Marketplaces'],
   ['china', 'China (JoomPro)', Ship, China, 'Produtos importáveis da China, com par no Mercado Livre', 'Fornecimento'],
+  ['amazon', 'Amazon', PackageSearch, Amazon, 'Os produtos cotados buscados na Amazon, pela API oficial', 'Marketplaces'],
   ['shopee', 'Shopee', ShoppingBag, Shopee, 'Mais vendidos da Shopee Brasil, pelo JoomPulse', 'Marketplaces'],
   ['alibaba', 'Alibaba', Factory, Alibaba, 'Fornecedores cotados para os produtos do Mercado Livre', 'Fornecimento'],
   ['cotacoes', 'Cotações', FileSpreadsheet, Cotacoes, 'Pacotes enviados ao Accio Work e comparação lado a lado', 'Fornecimento'],
@@ -864,7 +918,7 @@ const TODAS_AS_TELAS = [
   ['pedidos', 'Pedidos ao Claude', Bot, Pedidos, 'Fila do que só o Claude executa', 'Operação'],
   ['integracoes', 'Integrações', Plug, Integracoes, 'Situação de cada ligação', 'Operação'],
 ];
-const COM_BUSCA = new Set(['ml', 'shopee', 'china', 'alibaba']);
+const COM_BUSCA = new Set(['ml', 'shopee', 'china', 'alibaba', 'amazon']);
 // Pedidos e Integracoes falam com o backend deste computador; na versao hospedada ficam de fora.
 const TELAS = TODAS_AS_TELAS.filter(([id]) => !comSupabase || !['atendimento', 'pedidos', 'integracoes'].includes(id));
 const GRUPOS = [...new Set(TELAS.map((t) => t[5]))];

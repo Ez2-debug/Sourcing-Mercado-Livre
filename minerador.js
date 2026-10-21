@@ -37,6 +37,7 @@ const { lerShopee } = require('./server/shopee');
 const { lerJoompro } = require('./server/joompro');
 const { atualizarCambio, cambioGuardado } = require('./server/cambio');
 const { gravarBase } = require('./server/suportify');
+const amazon = require('./server/amazon');
 const { sincronizarRetratos } = require('./server/supabase');
 const { TIPOS, criarPedido, lerPedidos } = require('./server/pedidos');
 const { todosOsProdutos } = require('./server/mineracao');
@@ -331,6 +332,14 @@ function integracoes() {
       atualizado_em: lerJoompro() ? lerJoompro().consultado_em : null,
     },
     {
+      id: 'amazon', nome: 'Amazon', via: 'Creators API oficial (programa de Associados)',
+      ok: amazon.configurada(),
+      detalhe: amazon.configurada()
+        ? (amazon.lerComparacao() ? `${amazon.lerComparacao().itens.filter((i) => i.amazon).length} produtos comparados na Amazon.` : 'Credenciais configuradas; ainda sem comparação.')
+        : 'Faltam as credenciais da Creators API (AMAZON_CREDENTIAL_ID, AMAZON_CREDENTIAL_SECRET e AMAZON_PARTNER_TAG).',
+      atualizado_em: amazon.lerComparacao() ? amazon.lerComparacao().consultado_em : null,
+    },
+    {
       id: 'accio', nome: 'Accio Work', via: 'Pasta de pacotes neste computador',
       ok: pacotes.length > 0,
       detalhe: `${pacotes.length} pacotes gravados, ${pacotes.length - cotados.length} aguardando cotação.`,
@@ -349,6 +358,17 @@ function integracoes() {
       atualizado_em: pedidos.length ? pedidos[0].criado_em : null,
     },
   ];
+}
+
+// Produtos ja cotados no Alibaba: sao eles que a Amazon compara.
+function produtosCotados() {
+  const vistos = new Map();
+  for (const p of listarPacotes().pacotes.filter((x) => x.sourcing)) {
+    try {
+      for (const l of detalharPacote(p.id).linhas) if (l.candidato && !vistos.has(l.produto.id)) vistos.set(l.produto.id, { id: l.produto.id, nome: l.produto.nome });
+    } catch (_) { /* pacote sem resultado legivel */ }
+  }
+  return [...vistos.values()];
 }
 
 // Base de conhecimento do agente de atendimento, com os dados de agora.
@@ -424,6 +444,13 @@ function atender(req, res) {
   if (req.method === 'POST' && caminho === '/api/accio/planilha' && req.headers['x-conecta-hub'] === '1') {
     return comMensagem(res, () => planilhaDoPacote(pedido.searchParams.get('id')));
   }
+  if (req.method === 'POST' && caminho === '/api/amazon/comparar' && req.headers['x-conecta-hub'] === '1') {
+    return comMensagem(res, async () => {
+      const r = await amazon.compararNaAmazon(produtosCotados());
+      const retratos = await sincronizarRetratos();
+      return { itens: r.itens.length, com_resultado: r.itens.filter((i) => i.amazon).length, supabase: retratos };
+    });
+  }
   if (req.method === 'POST' && caminho === '/api/pedidos' && req.headers['x-conecta-hub'] === '1') {
     return comMensagem(res, async () => criarPedido(await lerCorpo(req)));
   }
@@ -445,6 +472,7 @@ function atender(req, res) {
   }
   if (caminho === '/api/integracoes') return json(res, 200, integracoes());
   if (caminho === '/api/produtos') return json(res, 200, produtosDoDia());
+  if (caminho === '/api/amazon') return json(res, 200, { configurada: amazon.configurada(), comparacao: amazon.lerComparacao() });
   if (caminho === '/api/cambio') return json(res, 200, cambioGuardado() || { venda: null });
   if (caminho === '/api/suportify') return json(res, 200, materialDoSuportify());
   if (caminho === '/api/joompro') return json(res, 200, lerJoompro() || { itens: [], consultado_em: null });

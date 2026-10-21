@@ -626,3 +626,50 @@ test('o cambio usa a cotacao guardada quando a rede falha e grava a nova quando 
   assert.equal(novo.cotado_em, '2026-10-08 13:08');
   assert.equal(cambioGuardado().venda, 5.0119);
 });
+
+test('Amazon: token so vai a Amazon, e cacheado, e a busca sai no formato da Creators API', async () => {
+  const amazon = require('../server/amazon');
+  const antes = { ...process.env };
+  try {
+    delete process.env.AMAZON_CREDENTIAL_ID;
+    assert.equal(amazon.configurada(), false);
+    await assert.rejects(() => amazon.buscarNaAmazon('relogio', 3, async () => { throw new Error('nao deveria chamar'); }), /nao esta configurada/);
+
+    Object.assign(process.env, { AMAZON_CREDENTIAL_ID: 'id-teste', AMAZON_CREDENTIAL_SECRET: 'segredo-teste', AMAZON_PARTNER_TAG: 'conecta-20' });
+    amazon.esquecerToken();
+    const chamadas = [];
+    const falsa = async (url, op) => {
+      chamadas.push({ url, op });
+      if (url.endsWith('/auth/o2/token')) return { ok: true, status: 200, json: async () => ({ access_token: 'tok', expires_in: 3600 }) };
+      return { ok: true, status: 200, json: async () => ({ searchResult: { items: [{
+        asin: 'B0TESTE', detailPageURL: 'https://www.amazon.com.br/dp/B0TESTE?tag=conecta-20',
+        itemInfo: { title: { displayValue: 'Relógio de Parede 30cm' } }, images: { primary: { medium: { url: 'https://m.media-amazon.com/images/I/x.jpg' } } },
+        offersV2: { listings: [{ price: { money: { amount: 49.9, currency: 'BRL', displayAmount: 'R$ 49,90' } } }] },
+        browseNodeInfo: { websiteSalesRank: { salesRank: 1234, displayName: 'Casa' } },
+      }] } }) };
+    };
+    const [item] = await amazon.buscarNaAmazon('Relogio De Parede 30cm', 3, falsa);
+    await amazon.buscarNaAmazon('outra busca', 3, falsa);
+    assert.deepEqual(item, { asin: 'B0TESTE', titulo: 'Relógio de Parede 30cm', link: 'https://www.amazon.com.br/dp/B0TESTE?tag=conecta-20', foto: 'https://m.media-amazon.com/images/I/x.jpg', preco: 49.9, moeda: 'BRL', ranking_de_vendas: 1234, categoria_do_ranking: 'Casa' });
+    assert.equal(chamadas.filter((c) => c.url.endsWith('/auth/o2/token')).length, 1, 'o token e reaproveitado');
+    assert.equal(chamadas[0].url, 'https://api.amazon.com/auth/o2/token', 'versao 3.1 cobre o Brasil');
+    assert.deepEqual(JSON.parse(chamadas[0].op.body), { grant_type: 'client_credentials', client_id: 'id-teste', client_secret: 'segredo-teste', scope: 'creatorsapi::default' });
+    const busca = chamadas[1];
+    assert.equal(busca.url, 'https://creatorsapi.amazon/catalog/v1/searchItems');
+    assert.equal(busca.op.headers['x-marketplace'], 'www.amazon.com.br');
+    assert.equal(busca.op.headers.authorization, 'Bearer tok');
+    const corpo = JSON.parse(busca.op.body);
+    assert.equal(corpo.partnerTag, 'conecta-20');
+    assert.equal(corpo.marketplace, 'www.amazon.com.br');
+    assert.ok(corpo.resources.includes('offersV2.listings.price'));
+    assert.ok(!busca.op.body.includes('segredo-teste'), 'o segredo nao vai na busca');
+    for (const c of chamadas) assert.match(new URL(c.url).hostname, /(^|\.)amazon(\.com)?$|^api\.amazon\.com$|^creatorsapi\.amazon$/);
+
+    process.env.AMAZON_CREDENTIAL_VERSION = '9.9';
+    await assert.rejects(() => amazon.compararNaAmazon([], falsa, 0), /AMAZON_CREDENTIAL_VERSION invalida/);
+  } finally {
+    for (const k of Object.keys(process.env)) if (!(k in antes)) delete process.env[k];
+    Object.assign(process.env, antes);
+    amazon.esquecerToken();
+  }
+});

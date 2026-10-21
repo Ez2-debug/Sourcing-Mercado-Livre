@@ -150,7 +150,9 @@ const COMPOSTO = [
   ['moq', 'MOQ (quantidade)', 11, 'inteiro'], ['aderencia', 'Alibaba: aderência', 10, 'inteiro'], ['cruzamento', 'Alibaba: cruzamento', 18],
   ['custo', 'Custo estimado un. (R$)', 13, 'reais'], ['margem', 'Margem bruta un. (R$)', 13, 'reais'], ['margemPct', 'Margem bruta (%)', 11, 'percentual'],
   ['investimento', 'Investimento no MOQ (R$)', 15, 'reais'], ['shopee', 'Shopee: produto parecido', 44], ['shopeePreco', 'Shopee: preço (R$)', 12, 'reais'],
-  ['shopeeVendas', 'Shopee: vendas est. 30 dias', 13, 'inteiro'], ['diferenca', 'ML menos Shopee (R$)', 13, 'reais'], ['decisao', 'Decisão', 13], ['observacoes', 'Observações', 36],
+  ['shopeeVendas', 'Shopee: vendas est. 30 dias', 13, 'inteiro'], ['diferenca', 'ML menos Shopee (R$)', 13, 'reais'],
+  ['amazon', 'Amazon: produto parecido', 44], ['amazonPreco', 'Amazon: preço (R$)', 12, 'reais'], ['amazonRanking', 'Amazon: ranking de vendas', 12, 'inteiro'],
+  ['diferencaAmazon', 'ML menos Amazon (R$)', 13, 'reais'], ['decisao', 'Decisão', 13], ['observacoes', 'Observações', 36],
 ];
 const COL = Object.fromEntries(COMPOSTO.map(([id], i) => [id, letra(i)]));
 const INDICE = Object.fromEntries(COMPOSTO.map(([id], i) => [id, i]));
@@ -158,14 +160,16 @@ const INDICE = Object.fromEntries(COMPOSTO.map(([id], i) => [id, i]));
 // Celulas de premissa no painel (coluna C).
 const PREMISSA = { dolar: 'Painel!$C$5', adicionais: 'Painel!$C$6', comissao: 'Painel!$C$7' };
 
-function abaComposta(linhas, produtos, shopee, cambio) {
+function abaComposta(linhas, produtos, shopee, cambio, amazon) {
   const porId = new Map(produtos.map((p) => [p.id, p]));
+  const naAmazon = new Map(((amazon && amazon.itens) || []).filter((i) => i.amazon).map((i) => [i.produto_id, i.amazon]));
   const dados = linhas.map((l, i) => {
     const r = i + 2;
     const ml = { ...(porId.get(l.produto.id) || {}), ...Object.fromEntries(Object.entries(l.produto).filter(([, v]) => v !== undefined && v !== null)) };
     const c = l.candidato || {};
     const faixa = faixaDePreco(c.preco);
     const s = parecidoNaShopee(l.produto.nome, shopee);
+    const a = naAmazon.get(l.produto.id);
     const celula = {
       num: i + 1,
       codigo: l.produto.id,
@@ -192,6 +196,10 @@ function abaComposta(linhas, produtos, shopee, cambio) {
       shopeePreco: s ? s.preco : undefined,
       shopeeVendas: s ? s.vendas_30_dias : undefined,
       diferenca: { formula: `IF(OR(${COL.mlPreco}${r}="",${COL.shopeePreco}${r}=""),"",${COL.mlPreco}${r}-${COL.shopeePreco}${r})` },
+      amazon: a ? link(a.titulo, a.link) : '',
+      amazonPreco: a && a.moeda === 'BRL' ? a.preco : undefined,
+      amazonRanking: a ? a.ranking_de_vendas : undefined,
+      diferencaAmazon: { formula: `IF(OR(${COL.mlPreco}${r}="",${COL.amazonPreco}${r}=""),"",${COL.mlPreco}${r}-${COL.amazonPreco}${r})` },
       decisao: '',
       observacoes: '',
     };
@@ -242,6 +250,7 @@ function abaPainel(quantas, cambio) {
       linha('Com fornecedor no Alibaba', f(`COUNT(${faixa('usdMin')})`), 'inteiro'),
       linha('Sem candidato', f(`COUNTIF(${faixa('anuncio')},"Sem candidato")`), 'inteiro'),
       linha('Com produto parecido na Shopee', f(`COUNT(${faixa('shopeePreco')})`), 'inteiro', 'A Shopee entra por semelhança de nome; confira cada par.'),
+      linha('Com produto parecido na Amazon', f(`COUNT(${faixa('amazonPreco')})`), 'inteiro', 'Primeiro resultado da busca pelo nome na Amazon; confira cada par.'),
       linha('Aderência média (Accio)', f(`IFERROR(AVERAGE(${faixa('aderencia')}),"")`), 'decimal', 'Nota de 0 a 100 dada pelo Accio para a semelhança entre o candidato e o produto.'),
       linha('Menor preço médio no Mercado Livre (R$)', f(`IFERROR(AVERAGE(${faixa('mlPreco')}),"")`), 'reais'),
       linha('Custo estimado médio por unidade (R$)', f(`IFERROR(AVERAGE(${faixa('custo')}),"")`), 'reais', 'Preço mínimo do anúncio, convertido pelo dólar e acrescido dos custos adicionais acima.'),
@@ -275,6 +284,7 @@ function abaSobre(tipo, dados) {
   notas.push(
     ['Mercado Livre', 'A API informa posição no ranking, não quantidade vendida. Vendas, avaliações e nota são estimativas do JoomPulse, quando registradas.'],
     ['Shopee', 'Vendas e faturamento são estimativas do JoomPulse a partir do contador público arredondado da Shopee; não são vendas reais.'],
+    ['Amazon', 'Primeiro resultado da busca pelo nome do produto na Amazon (Creators API oficial). Ranking de vendas é a posição na categoria da Amazon, não quantidade vendida. Confira se é o mesmo item.'],
     ['Alibaba', 'Preço e MOQ são os do anúncio, em dólares. Não é cotação FOB: frete, impostos e condições só saem com pedido ao fornecedor.'],
     ['Conversão para reais', dados.cambio && dados.cambio.venda ? `Dólar a R$ ${dados.cambio.venda.toFixed(4).replace('.', ',')} (${dados.cambio.fonte}, cotação de ${dados.cambio.cotado_em}).` : 'Sem cotação do dólar disponível ao gerar.'],
     ['NCM sugerida', 'Ponto de partida para o despachante; não é classificação fiscal e não traz alíquota.'],
@@ -302,7 +312,7 @@ export function montarRazao(tipo, entrada) {
   if (!rotulo) throw new Error(`tipo de razão desconhecido: ${tipo}`);
   let abas;
   if (tipo === 'composto') {
-    abas = [abaPainel(linhas.length, cambio), abaComposta(linhas, produtos, paraCasar, cambio), abaMercadoLivre(produtos), abaAlibaba(linhas, ncm, cambio), abaShopee(shopee)];
+    abas = [abaPainel(linhas.length, cambio), abaComposta(linhas, produtos, paraCasar, cambio, entrada.amazon), abaMercadoLivre(produtos), abaAlibaba(linhas, ncm, cambio), abaShopee(shopee)];
   } else if (tipo === 'mercado-livre') abas = [abaMercadoLivre(produtos)];
   else if (tipo === 'shopee') abas = [abaShopee(shopee)];
   else abas = [abaAlibaba(linhas, ncm, cambio)];
