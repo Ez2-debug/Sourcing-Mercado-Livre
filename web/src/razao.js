@@ -82,15 +82,15 @@ function abaMercadoLivre(produtos) {
     nome: 'Mercado Livre',
     congelar: 2,
     colunas: [
-      ['Código', 15], ['Produto', 58], ['Categoria', 38], ['Posição no ranking', 11, 'inteiro'], ['Menor preço (R$)', 13, 'reais'],
+      ['Código', 15], ['País', 10], ['Produto', 58], ['Categoria', 38], ['Posição no ranking', 11, 'inteiro'], ['Menor preço', 13, 'decimal2'], ['Moeda', 8],
       ['Situação na triagem', 20], ['NCM sugerida', 16], ['Prioridade', 11, 'inteiro'], ['Vendas estimadas (un.)', 12, 'inteiro'],
       ['Avaliações (qtd.)', 12, 'inteiro'], ['Nota (0 a 5)', 9], ['Fonte e período', 20], ['Link do produto', 46], ['Link da foto', 46],
     ],
     linhas: produtos.map((p) => [
-      p.id, link(p.nome, p.link), p.categoria, p.posicao, p.menor_preco, SITUACOES[p.situacao] || p.situacao || '', p.ncm || '', p.prioridade,
+      p.id, String(p.id).startsWith('MLM') ? 'México' : 'Brasil', link(p.nome, p.link), p.categoria, p.posicao, p.menor_preco, p.moeda || 'BRL', SITUACOES[p.situacao] || p.situacao || '', p.ncm || '', p.prioridade,
       p.vendas_estimadas, p.avaliacoes, p.nota, p.fonte_da_estimativa || '', link(p.link, p.link), link(p.foto, p.foto),
     ]),
-    formatacoes: [{ coluna: 7, tipo: 'barra' }, { coluna: 5, tipo: 'texto', texto: 'Apto', tom: 'verde' }],
+    formatacoes: [{ coluna: 9, tipo: 'barra' }, { coluna: 7, tipo: 'texto', texto: 'Apto', tom: 'verde' }],
   };
 }
 
@@ -303,7 +303,9 @@ export function montarRazao(tipo, entrada) {
   const shopee = entrada.shopee || [];
   // Para achar o parecido, valem tambem os itens buscados pelo nome dos produtos cotados.
   const paraCasar = shopee.concat(entrada.relacionados || []);
-  const linhas = (entrada.cotacoes || []).flatMap((c) => (c.linhas || []).map((l) => ({ ...l, categoria: c.categoria })));
+  // O composto compara precos em reais: por ora so entram produtos do Mercado Livre Brasil.
+  const linhas = (entrada.cotacoes || []).flatMap((c) => (c.linhas || []).map((l) => ({ ...l, categoria: c.categoria })))
+    .filter((l) => !String(l.produto.id).startsWith('MLM'));
   const ncm = new Map(produtos.filter((p) => p.ncm).map((p) => [p.id, p.ncm]));
   const cambio = entrada.cambio || null;
   const dados = { produtos, shopee, linhas, cambio };

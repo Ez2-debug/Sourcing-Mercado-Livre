@@ -33,6 +33,7 @@ A extensão instalada continua sendo a que o Claude Desktop executa; alteraçõe
 - `server/shopee.js` — produtos da Shopee Brasil a partir da resposta do JoomPulse (`query_cubejs_shopee`), gravados em disco.
 - `server/joompro.js` — catalogo de importacao da China (JoomPro) a partir do JoomPulse (`query_cubejs_joompro`), com o par no Mercado Livre.
 - `server/amazon.js` — Amazon pela Creators API oficial (token OAuth client_credentials e `searchItems`), para comparar os produtos cotados. Credenciais por variáveis de ambiente `AMAZON_*`, enviadas só aos endereços da Amazon.
+- `server/tendencias.js` — termos mais buscados no Mercado Livre de Brasil, México, Argentina, Chile e Colômbia (`/trends`), com cache de seis horas.
 - `server/cambio.js` — dolar PTAX do Banco Central (API publica), com cache; so para converter preco de anuncio.
 - `server/suportify.js` — textos e base de conhecimento (.md de perguntas e respostas) para o agente de atendimento no Suportify.
 - `server/pedidos.js` — fila de pedidos para o Claude (cotacao no Accio, atualizacao da Shopee, estimativas, texto livre).
@@ -66,6 +67,7 @@ O servidor MCP e o minerador não têm dependências externas: só módulos do N
 - Shopee: os dados vêm só do JoomPulse; vendas e faturamento são estimativas dele e saem sempre rotuladas assim. Sem raspagem do site da Shopee.
 - Compra Internacional: o anúncio é internacional quando traz a tag `cbt_item`; a origem é de onde o produto é enviado (`cbt_fulfillment_us` ou o endereço do vendedor), não a nacionalidade do vendedor. "China Grove, Texas" é o centro de distribuição nos EUA.
 - JoomPro: o par com o Mercado Livre é automático e a margem nunca sai sem a semelhança ao lado nem sem o aviso para conferir; nunca ordenar por margem. O custo é o menor entre as faixas de quantidade, não o do pedido mínimo.
+- Países: a credencial lê o ranking de produtos do Brasil (MLB) e do México (MLM); o site sai do prefixo do id (`siteDoId`). Argentina, Chile e Colômbia devolvem 403 em `/highlights` e só entram pelas tendências; Paraguai (MPY) não tem nem ranking nem tendências. Preço do México é em pesos (MXN): nunca exibir como reais.
 - `MELI_API_BASE` só aceita endereço local, para o Client Secret não sair para terceiros.
 - A versão aparece em três lugares e precisa andar junto: `manifest.json`, `package.json` e `SERVER_VERSION` em `server/index.js`.
 - Comentários e mensagens das ferramentas em português sem acento, como no código original.

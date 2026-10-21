@@ -38,6 +38,8 @@ const { lerJoompro } = require('./server/joompro');
 const { atualizarCambio, cambioGuardado } = require('./server/cambio');
 const { gravarBase } = require('./server/suportify');
 const amazon = require('./server/amazon');
+const { atualizarTendencias, lerTendencias } = require('./server/tendencias');
+const { siteDoId } = require('./server/meli');
 const { sincronizarRetratos } = require('./server/supabase');
 const { TIPOS, criarPedido, lerPedidos } = require('./server/pedidos');
 const { todosOsProdutos } = require('./server/mineracao');
@@ -206,6 +208,7 @@ async function ciclo() {
     });
     log(`concluida ${r.m.id}: ${r.arquivos.indicadores.totais.produtos} produtos`);
     await atualizarCambio();
+    await atualizarTendencias().catch(() => null);
     // Leva a Shopee e as cotacoes para o aplicativo hospedado, se o Supabase estiver configurado.
     const retratos = await sincronizarRetratos();
     if (retratos && retratos.erro) log(`retratos nao enviados: ${retratos.erro}`);
@@ -287,6 +290,8 @@ function produtosDoDia() {
         link: p.link,
         posicao: p.melhor_posicao,
         menor_preco: p.anuncios && p.anuncios.menor_preco ? p.anuncios.menor_preco.valor : undefined,
+        moeda: p.anuncios && p.anuncios.menor_preco ? p.anuncios.menor_preco.moeda : undefined,
+        site: siteDoId(p.id),
         situacao: situacaoDoProduto(p),
         prioridade: p.prioridade.pontos,
         ncm: ncmCurto(p),
@@ -473,6 +478,7 @@ function atender(req, res) {
   if (caminho === '/api/integracoes') return json(res, 200, integracoes());
   if (caminho === '/api/produtos') return json(res, 200, produtosDoDia());
   if (caminho === '/api/amazon') return json(res, 200, { configurada: amazon.configurada(), comparacao: amazon.lerComparacao() });
+  if (caminho === '/api/tendencias') return json(res, 200, lerTendencias() || { paises: {}, consultado_em: null });
   if (caminho === '/api/cambio') return json(res, 200, cambioGuardado() || { venda: null });
   if (caminho === '/api/suportify') return json(res, 200, materialDoSuportify());
   if (caminho === '/api/joompro') return json(res, 200, lerJoompro() || { itens: [], consultado_em: null });
@@ -488,7 +494,7 @@ function atender(req, res) {
 
   // Painel e catalogo de uma mineracao. O id vira nome de pasta: so o formato
   // gerado por salvarMineracao e so esses dois arquivos.
-  const m = /^\/mineracao\/(\d{8}-\d{6}-MLB\d{1,12})\/(painel|catalogo)\.html$/.exec(caminho);
+  const m = /^\/mineracao\/(\d{8}-\d{6}-ML[BM]\d{1,12})\/(painel|catalogo)\.html$/.exec(caminho);
   if (m) {
     const arquivo = path.join(pastaMineracoes(), m[1], `${m[2]}.html`);
     if (fs.existsSync(arquivo)) return responder(res, 200, 'text/html; charset=utf-8', fs.readFileSync(arquivo));
@@ -516,6 +522,7 @@ function main() {
     log(`central em http://127.0.0.1:${PORTA} | intervalo de ${INTERVALO_MIN} min`);
     if (!credentialsConfigured()) estado.problema = SEM_CREDENCIAL;
     atualizarCambio();
+    atualizarTendencias().catch(() => null);
     // A primeira mineracao espera um pouco, para um reinicio em sequencia nao disparar varias.
     agendar(30 * 1000);
   });

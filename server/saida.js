@@ -195,7 +195,7 @@ function carregarMineracao(id) {
   if (!ids.length) throw new ToolError('Ainda nao ha mineracao salva. Rode minerar_categoria primeiro.');
   const alvo = id === undefined || id === null || id === '' ? ids[0] : String(id).trim();
   // O id vira nome de pasta: so aceita o formato gerado por salvarMineracao.
-  if (!/^\d{8}-\d{6}-MLB\d{1,12}$/.test(alvo) || !ids.includes(alvo)) {
+  if (!/^\d{8}-\d{6}-ML[BM]\d{1,12}$/.test(alvo) || !ids.includes(alvo)) {
     throw new ToolError(`mineracao_id nao encontrado: "${id}". Use listar_mineracoes para ver os disponiveis.`);
   }
   return JSON.parse(fs.readFileSync(path.join(pastaMineracoes(), alvo, 'mineracao.json'), 'utf8'));

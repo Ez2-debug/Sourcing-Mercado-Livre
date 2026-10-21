@@ -18,7 +18,7 @@ const { todosOsProdutos } = require('./mineracao');
 const { ncmCurto } = require('./indicadores');
 const { cruzar, lerSourcingMd } = require('./sourcing');
 
-const ID_DE_MINERACAO = /^\d{8}-\d{6}-MLB\d{1,12}$/;
+const ID_DE_MINERACAO = /^\d{8}-\d{6}-ML[BM]\d{1,12}$/;
 // Sem codigo citado, so liga o resultado ao pacote com boa parte dos candidatos casados.
 const MIN_PARES = 5;
 const MIN_PROPORCAO = 0.6;

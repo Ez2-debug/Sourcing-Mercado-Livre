@@ -53,7 +53,7 @@ function criarPedido(entrada) {
   if (!Object.prototype.hasOwnProperty.call(TIPOS, e.tipo)) throw new ToolError(`tipo de pedido invalido: "${e.tipo}".`);
   const alvo = texto(e.alvo);
   const detalhe = texto(e.texto);
-  if (e.tipo === 'cotacao' && !/^\d{8}-\d{6}-MLB\d{1,12}$/.test(alvo)) throw new ToolError('Para cotacao, informe em "alvo" o id do pacote.');
+  if (e.tipo === 'cotacao' && !/^\d{8}-\d{6}-ML[BM]\d{1,12}$/.test(alvo)) throw new ToolError('Para cotacao, informe em "alvo" o id do pacote.');
   if (e.tipo === 'livre' && !detalhe) throw new ToolError('Escreva o pedido em "texto".');
   const pedidos = lerPedidos();
   // O mesmo pedido pendente nao entra duas vezes.

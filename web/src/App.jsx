@@ -1,10 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   Activity, ArrowDownRight, ArrowUpRight, BookOpenText, Bot, CheckCircle2, CircleAlert, ClipboardList, Download, FileSpreadsheet,
-  Factory, Globe, Headset, LayoutDashboard, PackageSearch, RefreshCw, Search, Ship, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
+  Factory, Flag, Globe, Headset, LayoutDashboard, PackageSearch, RefreshCw, Search, Ship, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
 } from 'lucide-react';
 import {
-  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarAmazon, carregarCambio, carregarIntegracoes, carregarJoompro, carregarSuportify, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
+  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarAmazon, carregarCambio, carregarIntegracoes, carregarTendencias, carregarJoompro, carregarSuportify, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
   carregarShopee, carregarVisaoGeral, comSupabase, comandarMinerador, compararNaAmazon, criarPedido, gerarPlanilhas, supabase,
 } from './fonte.js';
 import { Aviso, Botao, Card, CardTitulo, Carregando, Indicador, Selo, Tabela } from './ui.jsx';
@@ -16,6 +16,8 @@ import { baixarPlanilha } from './planilha.js';
 /* ------------------------------------------------------------------ */
 
 const reais = (v) => (typeof v === 'number' ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '');
+// Preco na moeda do pais do anuncio (reais no Brasil, pesos no Mexico).
+const dinheiro = (v, moeda) => (typeof v === 'number' ? v.toLocaleString('pt-BR', { style: 'currency', currency: moeda || 'BRL' }) : '');
 const inteiro = (v) => (typeof v === 'number' ? v.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) : '');
 const dia = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
@@ -254,7 +256,7 @@ function CartaoDeProduto({ p }) {
         ? <Selo tom="ok" className="self-start"><ArrowUpRight className="size-3" />{p.subiu} · {p.posicao_anterior}º → {p.posicao}º</Selo>
         : <Selo tom="primario" className="self-start">Entrou em {p.posicao}º</Selo>}
       <div className="text-sm break-words"><Nome nome={p.nome} link={p.link} /></div>
-      {typeof p.menor_preco === 'number' && <div className="text-lg font-semibold tabular-nums">{reais(p.menor_preco)}</div>}
+      {typeof p.menor_preco === 'number' && <div className="text-lg font-semibold tabular-nums">{dinheiro(p.menor_preco, p.moeda)}</div>}
       <p className="text-xs text-muted-foreground">{[p.categoria, p.ncm ? `NCM sugerida ${p.ncm}` : '', `comparado com ${dia(p.comparado_com)}`].filter(Boolean).join(' · ')}</p>
       <Cotar produto={p} />
     </article>
@@ -322,11 +324,11 @@ const SITUACOES = {
   proibido: ['erro', 'Proibido'],
 };
 
-function MercadoLivre() {
+function MercadoLivre({ site = 'MLB' }) {
   const [soAptos, setSoAptos] = useState(true);
   const { dados: d, erro, carregando } = useDados(carregarProdutos, 60000);
   const casa = useBusca();
-  const itens = d ? d.itens.filter((p) => (!soAptos || p.situacao === 'apto') && casa(p.nome, p.categoria, p.id)) : [];
+  const itens = d ? d.itens.filter((p) => String(p.id).startsWith(site) && (!soAptos || p.situacao === 'apto') && casa(p.nome, p.categoria, p.id)) : [];
   return (
     <Card>
       <CardTitulo
@@ -344,7 +346,7 @@ function MercadoLivre() {
             <tr key={`${p.mineracao_id}-${p.id}`}>
               <td className="min-w-64"><div className="flex items-center gap-3"><Foto src={p.foto} /><div className="min-w-0"><div className="break-words"><Nome nome={p.nome} link={p.link} /></div><div className="text-xs text-muted-foreground">{p.categoria}</div></div></div></td>
               <td className="text-right tabular-nums">{p.posicao}º</td>
-              <td className="text-right whitespace-nowrap tabular-nums">{reais(p.menor_preco)}</td>
+              <td className="text-right whitespace-nowrap tabular-nums">{dinheiro(p.menor_preco, p.moeda)}</td>
               <td><Selo tom={(SITUACOES[p.situacao] || ['neutro'])[0]}>{(SITUACOES[p.situacao] || [null, p.situacao])[1]}</Selo></td>
               <td className="whitespace-nowrap">{p.ncm || ''}</td>
               <td className="text-right tabular-nums" title={p.fonte_da_estimativa || ''}>{inteiro(p.vendas_estimadas)}</td>
@@ -455,6 +457,39 @@ function China() {
           })}
         </Tabela>
       )}
+    </Card>
+  );
+}
+
+const MercadoLivreBrasil = () => <MercadoLivre site="MLB" />;
+const MercadoLivreMexico = () => <MercadoLivre site="MLM" />;
+
+/* ------------------------------------------------------------------ */
+/* Tendencias por pais                                                 */
+/* ------------------------------------------------------------------ */
+
+function Tendencias() {
+  const { dados: d, erro, carregando } = useDados(carregarTendencias, 0);
+  const paises = d ? Object.entries(d.paises || {}) : [];
+  return (
+    <Card>
+      <CardTitulo
+        titulo="O que se busca no Mercado Livre de cada país"
+        descricao={`Termos mais buscados, na ordem que a API devolve, sem volume de busca${d && d.consultado_em ? `. Leitura de ${hora(d.consultado_em)}.` : '.'} Argentina, Chile e Colômbia só entram por aqui: a credencial não lê o ranking de produtos desses países.`}
+      />
+      <Estado erro={erro} carregando={carregando} dados={d} />
+      {d && !paises.length && <p className="text-sm text-muted-foreground">Ainda sem leitura. Ela é feita a cada mineração.</p>}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
+        {paises.map(([site, p]) => (
+          <div key={site} className="rounded-lg border p-3">
+            <div className="mb-2 flex items-center gap-2"><Flag className="size-4 text-primary" aria-hidden="true" /><span className="font-semibold">{p.nome}</span><Selo className="ml-auto">{p.termos.length}</Selo></div>
+            <ol className="list-decimal space-y-0.5 pl-5 text-sm">
+              {p.termos.slice(0, 20).map((t) => <li key={t.termo} className="break-words"><Nome nome={t.termo} link={t.link} /></li>)}
+            </ol>
+            {p.erro && <p className="text-xs text-muted-foreground">Não disponível nesta leitura.</p>}
+          </div>
+        ))}
+      </div>
     </Card>
   );
 }
@@ -905,7 +940,9 @@ function Integracoes() {
 const TODAS_AS_TELAS = [
   ['painel', 'Painel', LayoutDashboard, Painel, 'Mineração ao vivo e resumo do dia', 'Visão geral'],
   ['alta', 'Em alta', TrendingUp, EmAlta, 'Produtos aptos que subiram no ranking do Mercado Livre', 'Visão geral'],
-  ['ml', 'Mercado Livre', Store, MercadoLivre, 'Produtos minerados pela API oficial', 'Marketplaces'],
+  ['ml', 'Mercado Livre · Brasil', Store, MercadoLivreBrasil, 'Ranking do Mercado Livre Brasil: a demanda que a Compra Internacional atende', 'Marketplaces'],
+  ['ml-mx', 'Mercado Libre · México', Store, MercadoLivreMexico, 'Ranking do Mercado Libre México, com preços em pesos', 'Marketplaces'],
+  ['tendencias', 'Tendências por país', Flag, Tendencias, 'Termos mais buscados no Mercado Livre de cada país', 'Marketplaces'],
   ['ml-china', 'ML Internacional · China', Globe, InternacionalChina, 'Mercado Livre, Compra Internacional com envio da China', 'Marketplaces'],
   ['ml-eua', 'ML Internacional · EUA', Globe, InternacionalEua, 'Mercado Livre, Compra Internacional com envio dos Estados Unidos', 'Marketplaces'],
   ['china', 'China (JoomPro)', Ship, China, 'Produtos importáveis da China, com par no Mercado Livre', 'Fornecimento'],
@@ -918,7 +955,7 @@ const TODAS_AS_TELAS = [
   ['pedidos', 'Pedidos ao Claude', Bot, Pedidos, 'Fila do que só o Claude executa', 'Operação'],
   ['integracoes', 'Integrações', Plug, Integracoes, 'Situação de cada ligação', 'Operação'],
 ];
-const COM_BUSCA = new Set(['ml', 'shopee', 'china', 'alibaba', 'amazon']);
+const COM_BUSCA = new Set(['ml', 'ml-mx', 'shopee', 'china', 'alibaba', 'amazon']);
 // Pedidos e Integracoes falam com o backend deste computador; na versao hospedada ficam de fora.
 const TELAS = TODAS_AS_TELAS.filter(([id]) => !comSupabase || !['atendimento', 'pedidos', 'integracoes'].includes(id));
 const GRUPOS = [...new Set(TELAS.map((t) => t[5]))];

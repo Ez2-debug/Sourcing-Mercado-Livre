@@ -85,6 +85,7 @@ function emAlta(opcoes) {
         foto: p.foto,
         link: p.link,
         menor_preco: precoDe(p),
+        moeda: p.anuncios && p.anuncios.menor_preco ? p.anuncios.menor_preco.moeda : undefined,
         ncm: ncmCurto(p),
         posicao: p.melhor_posicao,
         posicao_anterior: a ? a.melhor_posicao : undefined,

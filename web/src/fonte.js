@@ -156,7 +156,7 @@ async function produtosDoSupabase() {
   const ids = mineracoes.filter((m) => !vistas.has(m.categoria_id) && vistas.add(m.categoria_id)).map((m) => m.id);
   if (!ids.length) return { total: 0, itens: [] };
   const linhas = await todasAsLinhas(() => supabase.from('chs_produtos')
-    .select('mineracao_id, produto_id, nome, categoria, foto, link, melhor_posicao, menor_preco, situacao, prioridade, ncm_posicao, ncm_codigos, estimativa_fonte, estimativa_periodo, estimativa_vendas, avaliacoes:dados->estimativa_externa->avaliacoes, nota:dados->estimativa_externa->avaliacao, internacional:dados->anuncios->internacional, menor_preco_nacional:dados->anuncios->menor_preco_nacional')
+    .select('mineracao_id, produto_id, nome, categoria, foto, link, melhor_posicao, menor_preco, situacao, prioridade, ncm_posicao, ncm_codigos, estimativa_fonte, estimativa_periodo, estimativa_vendas, moeda:dados->anuncios->menor_preco->moeda, avaliacoes:dados->estimativa_externa->avaliacoes, nota:dados->estimativa_externa->avaliacao, internacional:dados->anuncios->internacional, menor_preco_nacional:dados->anuncios->menor_preco_nacional')
     .in('mineracao_id', ids).not('nome', 'is', null).order('prioridade', { ascending: false }).order('produto_id'));
   const itens = linhas.slice(0, 200).map((p) => ({
     id: p.produto_id,
@@ -166,6 +166,8 @@ async function produtosDoSupabase() {
     link: p.link,
     posicao: p.melhor_posicao,
     menor_preco: p.menor_preco === null ? undefined : Number(p.menor_preco),
+    moeda: typeof p.moeda === 'string' ? p.moeda : undefined,
+    site: String(p.produto_id).slice(0, 3),
     situacao: p.situacao,
     prioridade: p.prioridade,
     ncm: Array.isArray(p.ncm_codigos) && p.ncm_codigos.length ? p.ncm_codigos[0] : (p.ncm_posicao ? `posição ${p.ncm_posicao.split(' ou ')[0]}` : undefined),
@@ -197,6 +199,9 @@ export const carregarAmazon = () => (comSupabase
   ? retrato('amazon').then((r) => ({ configurada: Boolean(r), comparacao: r }))
   : local('/api/amazon'));
 export const compararNaAmazon = () => comando('/api/amazon/comparar');
+export const carregarTendencias = () => (comSupabase
+  ? retrato('tendencias').then((r) => r || { paises: {}, consultado_em: null })
+  : local('/api/tendencias'));
 export const carregarCambio = () => (comSupabase ? retrato('cambio').then((r) => r || { venda: null }) : local('/api/cambio'));
 export const carregarSuportify = () => local('/api/suportify');
 export const carregarJoompro = () => (comSupabase

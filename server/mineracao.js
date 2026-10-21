@@ -13,7 +13,7 @@
  * expostos, e nao uma medida de demanda.
  */
 
-const { SITE, ToolError, apiGet, mapLimit } = require('./meli');
+const { ToolError, apiGet, mapLimit, siteDoId } = require('./meli');
 const {
   brandOf, dropEmpty, findSalesFields, pathForProduct, photosOf, publicLink, summarizeListings,
 } = require('./catalogo');
@@ -192,8 +192,8 @@ async function lerSinaisDaCategoria(no) {
     }
   };
   const [destaques, tendencias] = await Promise.all([
-    tolerante(`/highlights/${SITE}/category/${no.id}`),
-    tolerante(`/trends/${SITE}/${no.id}`),
+    tolerante(`/highlights/${siteDoId(no.id)}/category/${no.id}`),
+    tolerante(`/trends/${siteDoId(no.id)}/${no.id}`),
   ]);
   no.ranking = destaques && Array.isArray(destaques.content) ? destaques.content : [];
   no.termos_em_alta = Array.isArray(tendencias) ? tendencias.map((t) => t.keyword).filter(Boolean) : [];

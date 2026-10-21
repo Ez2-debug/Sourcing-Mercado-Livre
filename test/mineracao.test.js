@@ -673,3 +673,27 @@ test('Amazon: token so vai a Amazon, e cacheado, e a busca sai no formato da Cre
     amazon.esquecerToken();
   }
 });
+
+test('Mexico: ids, links e site saem do prefixo do id', () => {
+  const { siteDoId } = require('../server/meli');
+  const { categoryId, productId, publicLink } = require('../server/catalogo');
+  assert.equal(siteDoId('MLM1574'), 'MLM');
+  assert.equal(siteDoId('MLB1051'), 'MLB');
+  assert.equal(categoryId('mlm1574'), 'MLM1574');
+  assert.equal(productId('MLM46085382'), 'MLM46085382');
+  assert.throws(() => categoryId('MLA1000'), /invalido/);
+  assert.equal(publicLink('MLM46085382').link, 'https://www.mercadolibre.com.mx/p/MLM46085382');
+  assert.equal(publicLink('MLM123', 'ITEM').link, 'https://articulo.mercadolibre.com.mx/MLM-123-_JM');
+  assert.equal(publicLink('MLB123', 'ITEM').link, 'https://produto.mercadolivre.com.br/MLB-123-_JM');
+});
+
+test('tendencias por pais: guarda o que veio e mantem o anterior quando um pais falha', async () => {
+  const { atualizarTendencias } = require('../server/tendencias');
+  const r = await atualizarTendencias(async (p) => {
+    if (p === '/trends/MLC') throw new Error('403');
+    return [{ keyword: 'freidora de aire', url: 'https://listado.mercadolibre.cl/freidora' }];
+  });
+  assert.equal(r.paises.MLM.termos[0].termo, 'freidora de aire');
+  assert.equal(r.paises.MLC.termos.length, 0);
+  assert.equal(r.paises.MLC.erro, 'nao disponivel');
+});

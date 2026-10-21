@@ -5,7 +5,7 @@
 import { letra } from './razao.js';
 
 const FORMATOS = {
-  reais: '"R$" #,##0.00', dolar: '"US$" #,##0.00', inteiro: '#,##0', percentual: '0.0%', decimal: '0.0', cambio: '"R$" 0.0000',
+  reais: '"R$" #,##0.00', decimal2: '#,##0.00', dolar: '"US$" #,##0.00', inteiro: '#,##0', percentual: '0.0%', decimal: '0.0', cambio: '"R$" 0.0000',
 };
 const AZUL = 'FF1F4E78';
 const AMARELO = 'FFFFF2CC';

@@ -10,6 +10,18 @@
 
 const SERVER_NAME = 'conecta-hub-sourcing';
 const SITE = 'MLB';
+// Paises cujo ranking de produtos a credencial le. Os demais devolvem 403 em
+// /highlights e so entram pelas tendencias de busca (server/tendencias.js).
+const SITES = {
+  MLB: { pais: 'Brasil', moeda: 'BRL', www: 'www.mercadolivre.com.br', anuncio: 'produto.mercadolivre.com.br' },
+  MLM: { pais: 'México', moeda: 'MXN', www: 'www.mercadolibre.com.mx', anuncio: 'articulo.mercadolibre.com.mx' },
+};
+
+// O site sai do prefixo do id (MLB1051, MLM1574, MLBU123...).
+function siteDoId(id) {
+  const prefixo = String(id || '').slice(0, 3).toUpperCase();
+  return SITES[prefixo] ? prefixo : SITE;
+}
 const DEFAULT_API = 'https://api.mercadolibre.com';
 const TIMEOUT_MS = 15000;
 const ESPERA_429_MS = 1500;
@@ -203,6 +215,8 @@ async function mapLimit(items, limit, fn) {
 module.exports = {
   SERVER_NAME,
   SITE,
+  SITES,
+  siteDoId,
   ToolError,
   apiGet,
   cleanEnv,

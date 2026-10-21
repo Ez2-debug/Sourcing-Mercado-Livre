@@ -5,7 +5,7 @@
  * (categoria, produto e anuncios) no formato usado pelas ferramentas.
  */
 
-const { ToolError } = require('./meli');
+const { SITES, ToolError, siteDoId } = require('./meli');
 
 function categoryId(value, required) {
   if (value === undefined || value === null || value === '') {
@@ -13,15 +13,15 @@ function categoryId(value, required) {
     return null;
   }
   const id = String(value).trim().toUpperCase();
-  if (!/^MLB\d{1,12}$/.test(id)) {
-    throw new ToolError(`categoria_id invalido: "${value}". O formato e MLB seguido de numeros, como MLB1051.`);
+  if (!/^ML[BM]\d{1,12}$/.test(id)) {
+    throw new ToolError(`categoria_id invalido: "${value}". O formato e MLB (Brasil) ou MLM (Mexico) seguido de numeros, como MLB1051.`);
   }
   return id;
 }
 
 function productId(value) {
   const id = String(value === undefined || value === null ? '' : value).trim().toUpperCase();
-  if (!/^MLB[A-Z]{0,2}\d{1,15}$/.test(id)) {
+  if (!/^ML[BM][A-Z]{0,2}\d{1,15}$/.test(id)) {
     throw new ToolError(`produto_id invalido: "${value}". Use o id devolvido por mais_vendidos, como MLB54982411.`);
   }
   return id;
@@ -29,7 +29,7 @@ function productId(value) {
 
 function pathForProduct(id, type) {
   const t = String(type || '').toUpperCase();
-  if (t === 'USER_PRODUCT' || (!t && /^MLBU/.test(id))) return `/user-products/${id}`;
+  if (t === 'USER_PRODUCT' || (!t && /^ML[BM]U/.test(id))) return `/user-products/${id}`;
   if (t === 'ITEM') return `/items/${id}`;
   return `/products/${id}`;
 }
@@ -39,14 +39,16 @@ function pathForProduct(id, type) {
 function publicLink(id, type, permalink) {
   if (permalink) return { link: permalink };
   const t = String(type || '').toUpperCase();
-  const digits = String(id).replace(/^MLB[A-Z]*/, '');
-  if (t === 'USER_PRODUCT' || (!t && /^MLBU/.test(id))) {
-    return { link: `https://www.mercadolivre.com.br/up/${id}`, link_montado: true };
+  const site = siteDoId(id);
+  const s = SITES[site];
+  const digits = String(id).replace(/^ML[BM][A-Z]*/, '');
+  if (t === 'USER_PRODUCT' || (!t && /^ML[BM]U/.test(id))) {
+    return { link: `https://${s.www}/up/${id}`, link_montado: true };
   }
   if (t === 'ITEM') {
-    return { link: `https://produto.mercadolivre.com.br/MLB-${digits}-_JM`, link_montado: true };
+    return { link: `https://${s.anuncio}/${site}-${digits}-_JM`, link_montado: true };
   }
-  return { link: `https://www.mercadolivre.com.br/p/${id}`, link_montado: true };
+  return { link: `https://${s.www}/p/${id}`, link_montado: true };
 }
 
 // Procura, na resposta crua, qualquer campo que fale de vendas. Serve para
