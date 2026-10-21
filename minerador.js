@@ -39,6 +39,9 @@ const { atualizarCambio, cambioGuardado } = require('./server/cambio');
 const { gravarBase } = require('./server/suportify');
 const amazon = require('./server/amazon');
 const { atualizarTendencias, lerTendencias } = require('./server/tendencias');
+const { atualizarImportacoes, lerImportacoes } = require('./server/comtrade');
+const { carregarTabela } = require('./server/ncm');
+const { montarRadar } = require('./server/radar');
 const { siteDoId } = require('./server/meli');
 const { sincronizarRetratos } = require('./server/supabase');
 const { TIPOS, criarPedido, lerPedidos } = require('./server/pedidos');
@@ -209,6 +212,8 @@ async function ciclo() {
     log(`concluida ${r.m.id}: ${r.arquivos.indicadores.totais.produtos} produtos`);
     await atualizarCambio();
     await atualizarTendencias().catch(() => null);
+    radarGuardado = null;
+    atualizarParaguai();
     // Leva a Shopee e as cotacoes para o aplicativo hospedado, se o Supabase estiver configurado.
     const retratos = await sincronizarRetratos();
     if (retratos && retratos.erro) log(`retratos nao enviados: ${retratos.erro}`);
@@ -337,6 +342,12 @@ function integracoes() {
       atualizado_em: lerJoompro() ? lerJoompro().consultado_em : null,
     },
     {
+      id: 'paraguai', nome: 'Paraguai (importações)', via: 'UN Comtrade, base pública da ONU',
+      ok: Boolean(lerImportacoes('PRY')),
+      detalhe: lerImportacoes('PRY') ? `Importações de ${lerImportacoes('PRY').ano} contra ${lerImportacoes('PRY').ano_anterior}, por tipo de produto.` : 'Coleta mensal ainda não feita.',
+      atualizado_em: lerImportacoes('PRY') ? lerImportacoes('PRY').consultado_em : null,
+    },
+    {
       id: 'amazon', nome: 'Amazon', via: 'Creators API oficial (programa de Associados)',
       ok: amazon.configurada(),
       detalhe: amazon.configurada()
@@ -374,6 +385,27 @@ function produtosCotados() {
     } catch (_) { /* pacote sem resultado legivel */ }
   }
   return [...vistos.values()];
+}
+
+// Radar de tendencias com o que ja foi coletado. Guardado ate a proxima mineracao.
+let radarGuardado = null;
+function radar() {
+  if (radarGuardado && Date.now() - Date.parse(radarGuardado.gerado_em) < 10 * 60000) return radarGuardado;
+  radarGuardado = montarRadar({
+    produtos: produtosDoDia().itens,
+    emAlta: emAltaGuardado(PERIODOS[0]).subindo.concat(emAltaGuardado(PERIODOS[0]).entraram),
+    shopee: lerShopee(),
+    tendencias: lerTendencias(),
+    joompro: lerJoompro(),
+    paraguai: lerImportacoes('PRY'),
+    amazon: amazon.lerComparacao(),
+  });
+  return radarGuardado;
+}
+
+// Importacoes do Paraguai: o arquivo vale 30 dias; a coleta so roda quando vence.
+function atualizarParaguai() {
+  return carregarTabela().then((t) => atualizarImportacoes('PRY', t)).catch((err) => log(`importacoes do Paraguai: ${err.message}`));
 }
 
 // Base de conhecimento do agente de atendimento, com os dados de agora.
@@ -478,6 +510,7 @@ function atender(req, res) {
   if (caminho === '/api/integracoes') return json(res, 200, integracoes());
   if (caminho === '/api/produtos') return json(res, 200, produtosDoDia());
   if (caminho === '/api/amazon') return json(res, 200, { configurada: amazon.configurada(), comparacao: amazon.lerComparacao() });
+  if (caminho === '/api/radar') return json(res, 200, radar());
   if (caminho === '/api/tendencias') return json(res, 200, lerTendencias() || { paises: {}, consultado_em: null });
   if (caminho === '/api/cambio') return json(res, 200, cambioGuardado() || { venda: null });
   if (caminho === '/api/suportify') return json(res, 200, materialDoSuportify());
@@ -523,6 +556,7 @@ function main() {
     if (!credentialsConfigured()) estado.problema = SEM_CREDENCIAL;
     atualizarCambio();
     atualizarTendencias().catch(() => null);
+    atualizarParaguai();
     // A primeira mineracao espera um pouco, para um reinicio em sequencia nao disparar varias.
     agendar(30 * 1000);
   });

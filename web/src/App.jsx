@@ -1,10 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   Activity, ArrowDownRight, ArrowUpRight, BookOpenText, Bot, CheckCircle2, CircleAlert, ClipboardList, Download, FileSpreadsheet,
-  Factory, Flag, Globe, Headset, LayoutDashboard, PackageSearch, RefreshCw, Search, Ship, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
+  Factory, Flag, Globe, Headset, Radar as IconeRadar, Sparkles, LayoutDashboard, PackageSearch, RefreshCw, Search, Ship, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
 } from 'lucide-react';
 import {
-  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarAmazon, carregarCambio, carregarIntegracoes, carregarTendencias, carregarJoompro, carregarSuportify, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
+  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarAmazon, carregarCambio, carregarIntegracoes, carregarRadar, carregarTendencias, carregarJoompro, carregarSuportify, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
   carregarShopee, carregarVisaoGeral, comSupabase, comandarMinerador, compararNaAmazon, criarPedido, gerarPlanilhas, supabase,
 } from './fonte.js';
 import { Aviso, Botao, Card, CardTitulo, Carregando, Indicador, Selo, Tabela } from './ui.jsx';
@@ -463,6 +463,63 @@ function China() {
 
 const MercadoLivreBrasil = () => <MercadoLivre site="MLB" />;
 const MercadoLivreMexico = () => <MercadoLivre site="MLM" />;
+
+/* ------------------------------------------------------------------ */
+/* Radar de tendencias                                                 */
+/* ------------------------------------------------------------------ */
+
+function ItemDoRadar({ item }) {
+  return (
+    <li className="flex items-start gap-3">
+      {item.foto ? <Foto src={item.foto} /> : null}
+      <div className="min-w-0 text-sm">
+        <div className="break-words">{item.link ? <Nome nome={item.titulo} link={item.link} /> : <span className="font-medium">{item.titulo}</span>}{item.codigo ? <span className="text-xs text-muted-foreground"> · SH {item.codigo}</span> : null}</div>
+        <div className="text-xs text-muted-foreground">{[item.sinal, typeof item.preco === 'number' ? dinheiro(item.preco, item.moeda) : '', item.valor_usd ? `US$ ${inteiro(item.valor_usd)} importados` : '', item.detalhe].filter(Boolean).join(' · ')}</div>
+      </div>
+    </li>
+  );
+}
+
+function Radar() {
+  const { dados: d, erro, carregando } = useDados(carregarRadar, 0);
+  return (
+    <>
+      <Estado erro={erro} carregando={carregando} dados={d} />
+      {d && (
+        <>
+          <Card className="mb-4">
+            <CardTitulo titulo="Sinais em mais de um mercado" descricao={d.aviso} />
+            {!d.cruzados.length && <p className="text-sm text-muted-foreground">Nenhum sinal repetido entre mercados nesta leitura.</p>}
+            <ul className="grid gap-3 md:grid-cols-2">{d.cruzados.map((c) => <ItemDoRadar key={c.titulo} item={c} />)}</ul>
+          </Card>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,360px),1fr))] gap-4">
+            {d.mercados.map((m) => (
+              <Card key={m.id}>
+                <div className="mb-3 flex items-start gap-2">
+                  <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+                  <div className="mr-auto min-w-0"><h2 className="text-base font-semibold">{m.mercado}</h2><p className="text-xs text-muted-foreground">{m.fonte}</p></div>
+                  {m.pendente && <Selo tom="alerta">aguardando credencial</Selo>}
+                </div>
+                {m.aviso && <p className="mb-3 text-xs text-muted-foreground">{m.aviso}</p>}
+                {m.produtos && m.produtos.length > 0 && <ul className="mb-3 grid gap-2.5">{m.produtos.map((p) => <ItemDoRadar key={p.titulo + (p.link || '')} item={p} />)}</ul>}
+                {m.categorias && m.categorias.length > 0 && <ul className="mb-3 grid gap-2.5">{m.categorias.map((c) => <ItemDoRadar key={c.codigo} item={c} />)}</ul>}
+                {m.termos && m.termos.length > 0 && (
+                  <div>
+                    <div className="mb-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Mais buscados</div>
+                    <div className="flex flex-wrap gap-1.5">{m.termos.map((t) => (linkSeguro(t.link)
+                      ? <a key={t.termo} href={t.link} target="_blank" rel="noopener noreferrer" className="rounded-full border px-2.5 py-0.5 text-xs hover:bg-muted">{t.termo}</a>
+                      : <span key={t.termo} className="rounded-full border px-2.5 py-0.5 text-xs">{t.termo}</span>))}</div>
+                  </div>
+                )}
+                {!((m.produtos || []).length || (m.categorias || []).length || (m.termos || []).length) && <p className="text-sm text-muted-foreground">Sem dados nesta leitura.</p>}
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /* Tendencias por pais                                                 */
@@ -939,6 +996,7 @@ function Integracoes() {
 /* ------------------------------------------------------------------ */
 
 const TODAS_AS_TELAS = [
+  ['radar', 'Radar de tendências', IconeRadar, Radar, 'O que está em alta em cada mercado, com a fonte de cada sinal', 'Visão geral'],
   ['painel', 'Painel', LayoutDashboard, Painel, 'Mineração ao vivo e resumo do dia', 'Visão geral'],
   ['alta', 'Em alta', TrendingUp, EmAlta, 'Produtos aptos que subiram no ranking do Mercado Livre', 'Visão geral'],
   ['ml', 'Mercado Livre · Brasil', Store, MercadoLivreBrasil, 'Ranking do Mercado Livre Brasil: a demanda que a Compra Internacional atende', 'Marketplaces'],
@@ -963,7 +1021,7 @@ const GRUPOS = [...new Set(TELAS.map((t) => t[5]))];
 
 export default function App() {
   const [sessao, setSessao] = useState(undefined);
-  const [tela, setTela] = useState('painel');
+  const [tela, setTela] = useState('radar');
   const [busca, setBusca] = useState('');
 
   useEffect(() => {

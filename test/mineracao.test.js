@@ -725,3 +725,28 @@ test('cambio guarda o peso mexicano pela conversao do Mercado Livre', async () =
   assert.equal(r.mxn.venda, 0.2722);
   assert.equal(r.mxn.cotado_em, '2026-10-21 14:11');
 });
+
+test('radar: um bloco por mercado, sinais cruzados e Paraguai so com bens de consumo', () => {
+  const { montarRadar } = require('../server/radar');
+  const r = montarRadar({
+    produtos: [{ id: 'MLM1', nome: 'Toallero', situacao: 'apto', posicao: 2, categoria: 'Hogar', menor_preco: 164, moeda: 'MXN' }],
+    emAlta: [{ id: 'MLB9', nome: 'Mesa Dobravel', posicao: 5, posicao_anterior: 6, categoria: 'Casa' }],
+    shopee: { itens: [{ nome: 'Cortina Blackout Sala', tendencia: 'subindo', tem_marca: false, vendas_30_dias: 7000, preco: 31 }] },
+    tendencias: { paises: {
+      MLB: { nome: 'Brasil', termos: [{ termo: 'cortina blackout' }, { termo: 'air fryer' }] },
+      MLM: { nome: 'México', termos: [{ termo: 'Air Fryer' }] },
+      MLA: { nome: 'Argentina', termos: [] },
+    } },
+    paraguai: { ano: 2025, ano_anterior: 2024, linhas: [
+      { posicao: '71.17', descricao: 'Bijuterias.', valor_usd: 8463680, variacao: 1.17 },
+      { posicao: '84.10', descricao: 'Turbinas hidraulicas', valor_usd: 4082121, variacao: 6.2 },
+    ] },
+  });
+  const m = Object.fromEntries(r.mercados.map((x) => [x.id, x]));
+  assert.equal(m.brasil.produtos[0].sinal, 'subiu de 6º para 5º');
+  assert.equal(m.mexico.produtos[0].moeda, 'MXN', 'sem historico no Mexico, entram os aptos do ranking');
+  assert.deepEqual(m.paraguai.categorias.map((c) => c.codigo), ['71.17'], 'turbina nao e bem de consumo');
+  assert.ok(r.cruzados.some((c) => /air fryer/i.test(c.titulo) && /Brasil, México/.test(c.sinal)));
+  assert.ok(r.cruzados.some((c) => /Cortina Blackout/.test(c.titulo)), 'Shopee em alta que tambem e busca no Mercado Livre');
+  assert.equal(m.amazon.pendente, true);
+});

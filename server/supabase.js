@@ -174,6 +174,8 @@ async function sincronizarRetratos() {
     if (shopee) linhas.push({ chave: 'shopee', atualizado_em: agora, dados: shopee });
     const comparacao = require('./amazon').lerComparacao();
     if (comparacao) linhas.push({ chave: 'amazon', atualizado_em: agora, dados: comparacao });
+    const paraguai = require('./comtrade').lerImportacoes('PRY');
+    if (paraguai) linhas.push({ chave: 'paraguai', atualizado_em: agora, dados: paraguai });
     const tendencias = require('./tendencias').lerTendencias();
     if (tendencias) linhas.push({ chave: 'tendencias', atualizado_em: agora, dados: tendencias });
     const cambio = require('./cambio').cambioGuardado();

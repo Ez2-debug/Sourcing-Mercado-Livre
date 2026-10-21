@@ -199,6 +199,15 @@ export const carregarAmazon = () => (comSupabase
   ? retrato('amazon').then((r) => ({ configurada: Boolean(r), comparacao: r }))
   : local('/api/amazon'));
 export const compararNaAmazon = () => comando('/api/amazon/comparar');
+// Na versao hospedada o radar e montado no navegador com os mesmos retratos.
+export async function carregarRadar() {
+  if (!comSupabase) return local('/api/radar');
+  const { montarRadar } = await import('./radar.js');
+  const [produtos, shopee, tendencias, joompro, paraguai, amazon] = await Promise.all([
+    produtosDoSupabase().catch(() => ({ itens: [] })), retrato('shopee'), retrato('tendencias'), retrato('joompro'), retrato('paraguai'), retrato('amazon'),
+  ]);
+  return montarRadar({ produtos: produtos.itens, emAlta: [], shopee, tendencias, joompro, paraguai, amazon });
+}
 export const carregarTendencias = () => (comSupabase
   ? retrato('tendencias').then((r) => r || { paises: {}, consultado_em: null })
   : local('/api/tendencias'));
