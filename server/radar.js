@@ -44,7 +44,7 @@ function posicaoDaNcm(ncm) {
   return d.length >= 4 ? d.slice(0, 4) : null;
 }
 
-// entrada: { produtos, emAlta, shopee, tendencias, joompro, paraguai, aduana, amazon, internacional, traducoes }
+// entrada: { produtos, emAlta, shopee, tendencias, joompro, paraguai, aduana, comprasParaguai, amazon, internacional, traducoes }
 // So produtos, tudo em portugues: titulo em outra lingua sai traduzido quando
 // ha traducao guardada (traducoes: { textos: { original: portugues } }).
 function montarRadar(entrada) {
@@ -100,6 +100,20 @@ function montarRadar(entrada) {
     aviso: 'Produtos: importações de consumo liberadas pela aduana no último mês publicado que mais cresceram, com o nome da NCM. Categorias: crescimento anual pela ONU.',
   });
 
+  // Paraguai no varejo: o que o brasileiro mais procura nas lojas de la.
+  const cp = e.comprasParaguai;
+  mercados.push({
+    id: 'compras-paraguai', mercado: 'Paraguai · lojas (Compras Paraguai)',
+    fonte: 'Compras Paraguai, mais buscados do dia',
+    produtos: ((cp && cp.mais_buscados) || []).map((p) => ({
+      titulo: p.nome, link: p.link, foto: p.foto, preco: p.preco_brl, moeda: 'BRL',
+      sinal: [`${p.posicao}º entre os mais buscados`, p.entrou_hoje ? 'entrou hoje' : (p.dias_na_lista > 1 ? `${p.dias_na_lista} dias na lista` : ''),
+        typeof p.preco_usd === 'number' ? `a partir de US$ ${p.preco_usd.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '',
+        p.ofertas ? `${p.ofertas} ofertas em ${p.lojas || '?'} lojas` : ''].filter(Boolean).join(' · '),
+    })),
+    aviso: 'Produtos que os brasileiros mais procuram no comparador de preços das lojas do Paraguai. Preço é a menor oferta publicada no dia, convertida pelo próprio site.',
+  });
+
   const joompro = ((e.joompro && e.joompro.itens) || []).slice(0, 8).map((j) => ({
     // Titulo do par no Mercado Livre Brasil: o do catalogo vem em ingles.
     titulo: (j.mercado_livre && j.mercado_livre.titulo) || j.titulo, detalhe: j.mercado_livre && j.mercado_livre.categoria, link: j.link, foto: j.foto, preco: j.custo_no_brasil, moeda: 'BRL',
@@ -127,6 +141,12 @@ function montarRadar(entrada) {
   // Produtos em mais de um mercado: Shopee em alta que tambem e busca no
   // Brasil, o que se vende de fora nas duas lojas e o que cresce no Paraguai.
   const cruzados = [];
+  // Mais buscado nas lojas do Paraguai e em alta no Mercado Livre Brasil.
+  for (const c of ((cp && cp.mais_buscados) || [])) {
+    const nome = palavras(c.nome).slice(0, 4);
+    const br = emAlta.filter(doSite('MLB')).concat(aptos('MLB')).find((p) => { const w = new Set(palavras(p.nome)); return nome.length >= 2 && nome.filter((x) => w.has(x)).length >= Math.min(3, nome.length); });
+    if (br) cruzados.push({ titulo: br.nome, link: br.link, foto: br.foto, sinal: `em alta no Mercado Livre Brasil e entre os mais buscados nas lojas do Paraguai ("${c.nome}")` });
+  }
   const buscasBr = termos('MLB').map((t) => palavras(t.termo)).filter((p) => p.length);
   for (const s of shopee) {
     const nome = new Set(palavras(s.titulo));

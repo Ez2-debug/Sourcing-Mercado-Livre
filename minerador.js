@@ -46,6 +46,7 @@ const { atualizarAduana, tendenciasDaAduana } = require('./server/aduanapy');
 const { atualizarBuscas, lerBuscas } = require('./server/buscasgoogle');
 const { lerInternacional } = require('./server/internacional');
 const { lerTraducoes, traduzirPendentes } = require('./server/traducao');
+const { atualizarComprasParaguai, lerComprasParaguai } = require('./server/comprasparaguai');
 const { siteDoId } = require('./server/meli');
 const { sincronizarRetratos } = require('./server/supabase');
 const { TIPOS, criarPedido, lerPedidos } = require('./server/pedidos');
@@ -346,6 +347,12 @@ function integracoes() {
       atualizado_em: lerJoompro() ? lerJoompro().consultado_em : null,
     },
     {
+      id: 'compras-paraguai', nome: 'Paraguai (Compras Paraguai)', via: 'Página inicial do comparador, uma leitura por dia',
+      ok: Boolean(lerComprasParaguai()),
+      detalhe: lerComprasParaguai() ? `${lerComprasParaguai().mais_buscados.length} mais buscados e ${lerComprasParaguai().destaques.length} destaques na última leitura.` : 'Primeira leitura ainda não feita.',
+      atualizado_em: lerComprasParaguai() ? lerComprasParaguai().consultado_em : null,
+    },
+    {
       id: 'aduana-py', nome: 'Paraguai (aduana)', via: 'Dados abertos da aduana do Paraguai (DNIT)',
       ok: Boolean(tendenciasDaAduana()),
       detalhe: tendenciasDaAduana() ? `Importações de ${tendenciasDaAduana().mes} comparadas com ${tendenciasDaAduana().comparado_com || 'o mês anterior'}. O portal publica um arquivo por mês.` : 'Primeira carga ainda não feita.',
@@ -443,6 +450,7 @@ function radar() {
     amazon: amazon.lerComparacao(),
     internacional: lerInternacional(),
     traducoes: lerTraducoes(),
+    comprasParaguai: lerComprasParaguai(),
   });
   traduzirRadar(radarGuardado);
   return radarGuardado;
@@ -452,6 +460,7 @@ function radar() {
 // arquivo e grande, entao so uma coleta por vez) e buscas do Google (a cada 3 h).
 let aduanaRodando = false;
 function atualizarParaguai() {
+  atualizarComprasParaguai().then(() => { radarGuardado = null; }).catch((err) => log(`Compras Paraguai: ${err.message}`));
   atualizarBuscas().then(() => { radarGuardado = null; }).catch((err) => log(`buscas do Google: ${err.message}`));
   if (!aduanaRodando) {
     aduanaRodando = true;
@@ -564,7 +573,7 @@ function atender(req, res) {
   if (caminho === '/api/amazon') return json(res, 200, { configurada: amazon.configurada(), comparacao: amazon.lerComparacao() });
   if (caminho === '/api/radar') return json(res, 200, radar());
   if (caminho === '/api/internacional') return json(res, 200, lerInternacional() || { china: null, eua: null, shopee: null, nas_duas_lojas: [] });
-  if (caminho === '/api/paraguai') return json(res, 200, { aduana: tendenciasDaAduana(), buscas: lerBuscas() });
+  if (caminho === '/api/paraguai') return json(res, 200, { aduana: tendenciasDaAduana(), buscas: lerBuscas(), compras_paraguai: lerComprasParaguai() });
   if (caminho === '/api/tendencias') return json(res, 200, lerTendencias() || { paises: {}, consultado_em: null });
   if (caminho === '/api/cambio') return json(res, 200, cambioGuardado() || { venda: null });
   if (caminho === '/api/suportify') return json(res, 200, materialDoSuportify());

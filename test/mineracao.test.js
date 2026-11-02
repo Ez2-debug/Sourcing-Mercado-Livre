@@ -850,3 +850,24 @@ test('traducao: guarda o que traduziu, respeita o limite do dia e nao repete', a
   assert.equal(chamadas, 2, 'o que ja foi traduzido nao vai de novo');
   assert.equal(await traduzirPendentes(['x'.repeat(390), 'y'.repeat(390)].concat(Array.from({ length: 20 }, (_, i) => `${i}`.repeat(300))), 'es', buscar, agora) < 22, true, 'para no limite diario');
 });
+
+test('Compras Paraguai: le os mais buscados, ignora patrocinados e conta os dias na lista', async () => {
+  const { atualizarComprasParaguai } = require('../server/comprasparaguai');
+  const cartao = (id, nome, usd, brl) => `<div class="promocao-produtos-item"><a href="/${nome.toLowerCase().replace(/ /g, '-')}_${id}/"><img src="https://img.test/${id}.webp"/></a>` +
+    `<div class="promocao-item-nome"><a href="/x_${id}/">${nome}</a></div><span>US$ ${usd}</span><div class="promocao-item-preco-text">R$ ${brl}</div>` +
+    `<a class="btn">12 OFERTAS</a><span>em 5 lojas</span></div>`;
+  const pagina = (ids) => '<span>Destaques</span>' + cartao(9, 'Caixa de Som', '219,90', '1.191,86') + '<span>Patrocinado</span>' + cartao(8, 'Patrocinado X', '1,00', '5,00') +
+    '<!-- Begin: Mais buscados -->' + ids.map((i) => cartao(i, `Produto ${i}`, '75,50', '409,21')).join('') + '<!-- End: Mais buscados -->';
+  const buscar = (ids) => async () => ({ ok: true, text: async () => pagina(ids) });
+  await atualizarComprasParaguai(buscar([1, 2]), new Date('2026-11-01T12:00:00Z'));
+  const r = await atualizarComprasParaguai(buscar([2, 3]), new Date('2026-11-02T12:00:00Z'));
+  assert.deepEqual(r.mais_buscados.map((x) => x.nome), ['Produto 2', 'Produto 3']);
+  assert.equal(r.mais_buscados[0].preco_usd, 75.5);
+  assert.equal(r.mais_buscados[0].preco_brl, 409.21);
+  assert.equal(r.mais_buscados[0].dias_na_lista, 2);
+  assert.equal(r.mais_buscados[1].entrou_hoje, true);
+  assert.deepEqual(r.destaques.map((x) => x.nome), ['Caixa de Som'], 'patrocinado fica de fora');
+  let chamou = false;
+  await atualizarComprasParaguai(async () => { chamou = true; return { ok: true, text: async () => '' }; }, new Date('2026-11-02T20:00:00Z'));
+  assert.equal(chamou, false, 'uma leitura por dia');
+});
