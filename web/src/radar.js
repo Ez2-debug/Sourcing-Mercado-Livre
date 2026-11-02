@@ -94,13 +94,22 @@ function montarRadar(entrada) {
   // anual pela ONU e o termometro diario das buscas no Google.
   const aduana = e.aduana;
   const pct = (v) => `${v > 0 ? '+' : ''}${Math.round(v * 100)}%`;
+  // A aduana nao tem foto: usa a de um produto minerado no Brasil com a mesma
+  // posicao da NCM, marcada como ilustrativa.
+  const fotoDaPosicao = new Map();
+  for (const p of produtos) {
+    const pos = posicaoDaNcm(p.ncm);
+    if (pos && p.foto && !fotoDaPosicao.has(pos)) fotoDaPosicao.set(pos, p.foto);
+  }
   const produtosPy = ((aduana && aduana.subindo) || []).slice(0, 10).map((n) => ({
+    foto: fotoDaPosicao.get(n.ncm.replace(/[^0-9]/g, '').slice(0, 4)),
     // Nome da NCM brasileira: a nomenclatura e a mesma do Mercosul.
     titulo: n.nome_pt || n.descricao,
     codigo: n.ncm,
     valor_usd: n.fob_usd,
     sinal: [`${pct(n.variacao_mes)} contra ${aduana.comparado_com}`, typeof n.variacao_ano === 'number' ? `${pct(n.variacao_ano)} em um ano` : '',
-      n.origens && n.origens[0] ? `${Math.round(n.origens[0].participacao * 100)}% de ${n.origens[0].pais}` : ''].filter(Boolean).join(' · '),
+      n.origens && n.origens[0] ? `${Math.round(n.origens[0].participacao * 100)}% de ${n.origens[0].pais}` : '',
+      fotoDaPosicao.has(n.ncm.replace(/[^0-9]/g, '').slice(0, 4)) ? 'foto ilustrativa' : ''].filter(Boolean).join(' · '),
   }));
   const py = emAltaNasImportacoes(e.paraguai, 8);
   mercados.push({

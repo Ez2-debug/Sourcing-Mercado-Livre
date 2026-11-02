@@ -30,7 +30,9 @@ function hora(iso) {
 
 // Fotos e links vem de fora: so entram na pagina os enderecos esperados.
 const CDNS = /^https:\/\/[a-z0-9.-]+\.(mlstatic\.com|susercontent\.com|alicdn\.com|joomprocdn\.net|media-amazon\.com|ssl-images-amazon\.com)\//i;
-const fotoSegura = (u) => (typeof u === 'string' && CDNS.test(u) ? u : null);
+// Fotos do Compras Paraguai: so a pasta de midia do site dentro do armazenamento da Linode.
+const FOTOS_COMPRAS_PARAGUAI = /^https:\/\/(bucket-prod\.)?us-ord-10\.linodeobjects\.com\/(bucket-prod\/)?site\/media\/fotos\//i;
+const fotoSegura = (u) => (typeof u === 'string' && (CDNS.test(u) || FOTOS_COMPRAS_PARAGUAI.test(u)) ? u : null);
 const linkSeguro = (u) => (typeof u === 'string' && /^https:\/\//i.test(u) ? u : null);
 
 // Texto digitado na busca do topo. As telas de lista filtram por ele.
