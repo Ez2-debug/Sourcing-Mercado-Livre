@@ -47,6 +47,7 @@ const { atualizarBuscas, lerBuscas } = require('./server/buscasgoogle');
 const { lerInternacional } = require('./server/internacional');
 const { lerTraducoes, traduzirPendentes } = require('./server/traducao');
 const { atualizarComprasParaguai, lerComprasParaguai } = require('./server/comprasparaguai');
+const { lerMaisVendidos } = require('./server/maisvendidos');
 const { siteDoId } = require('./server/meli');
 const { sincronizarRetratos } = require('./server/supabase');
 const { TIPOS, criarPedido, lerPedidos } = require('./server/pedidos');
@@ -572,6 +573,7 @@ function atender(req, res) {
   if (caminho === '/api/produtos') return json(res, 200, produtosDoDia());
   if (caminho === '/api/amazon') return json(res, 200, { configurada: amazon.configurada(), comparacao: amazon.lerComparacao() });
   if (caminho === '/api/radar') return json(res, 200, radar());
+  if (caminho === '/api/mais-vendidos') return json(res, 200, lerMaisVendidos() || { marketplaces: {}, generos: [] });
   if (caminho === '/api/internacional') return json(res, 200, lerInternacional() || { china: null, eua: null, shopee: null, nas_duas_lojas: [] });
   if (caminho === '/api/paraguai') return json(res, 200, { aduana: tendenciasDaAduana(), buscas: lerBuscas(), compras_paraguai: lerComprasParaguai() });
   if (caminho === '/api/tendencias') return json(res, 200, lerTendencias() || { paises: {}, consultado_em: null });

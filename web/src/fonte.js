@@ -211,6 +211,9 @@ export async function carregarRadar() {
   ]);
   return montarRadar({ produtos: produtos.itens, emAlta: [], shopee, tendencias, joompro, paraguai, amazon, aduana, internacional, traducoes, comprasParaguai });
 }
+export const carregarMaisVendidos = () => (comSupabase
+  ? retrato('mais-vendidos').then((r) => r || { marketplaces: {}, generos: [] })
+  : local('/api/mais-vendidos'));
 export const carregarInternacional = () => (comSupabase ? retrato('internacional') : local('/api/internacional'));
 export const carregarTendencias = () => (comSupabase
   ? retrato('tendencias').then((r) => r || { paises: {}, consultado_em: null })

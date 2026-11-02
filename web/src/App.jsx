@@ -4,7 +4,7 @@ import {
   Factory, Globe, Headset, Radar as IconeRadar, Sparkles, LayoutDashboard, PackageSearch, RefreshCw, Search, Ship, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
 } from 'lucide-react';
 import {
-  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarAmazon, carregarCambio, carregarIntegracoes, carregarRadar, carregarInternacional, carregarJoompro, carregarSuportify, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
+  COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarAmazon, carregarCambio, carregarIntegracoes, carregarRadar, carregarInternacional, carregarMaisVendidos, carregarJoompro, carregarSuportify, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
   carregarShopee, carregarVisaoGeral, comSupabase, comandarMinerador, compararNaAmazon, criarPedido, gerarPlanilhas, supabase,
 } from './fonte.js';
 import { Aviso, Botao, Card, CardTitulo, Carregando, Indicador, Selo, Tabela } from './ui.jsx';
@@ -406,8 +406,10 @@ function Internacional({ origem }) {
   );
 }
 
-const InternacionalChina = () => <Internacional origem="china" />;
-const InternacionalEua = () => <Internacional origem="estados_unidos" />;
+// Compra Internacional: mais vendidos (JoomPulse) por categoria e, abaixo, o
+// que apareceu como internacional no ranking minerado.
+const InternacionalChina = () => <><MaisVendidos tipoFixo="ml-internacional" origemFixa="China" /><div className="mt-4"><Internacional origem="china" /></div></>;
+const InternacionalEua = () => <><MaisVendidos tipoFixo="ml-internacional" origemFixa="Estados Unidos" /><div className="mt-4"><Internacional origem="estados_unidos" /></div></>;
 
 /* ------------------------------------------------------------------ */
 /* China pelo JoomPro                                                  */
@@ -519,6 +521,123 @@ function Radar() {
           </div>
         </>
       )}
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Mais vendidos por categoria (todos os marketplaces)                 */
+/* ------------------------------------------------------------------ */
+
+const ABAS_MAIS_VENDIDOS = [
+  ['ml', 'Mercado Livre'],
+  ['ml-internacional', 'ML Compra Internacional'],
+  ['shopee', 'Shopee'],
+  ['shopee-internacional', 'Shopee internacional'],
+  ['joompro', 'China · fornecedores'],
+];
+
+function Chips({ opcoes, valor, aoMudar, rotulo }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={rotulo}>
+      <span className="mr-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">{rotulo}</span>
+      {opcoes.map(([id, texto, n]) => (
+        <button key={id} onClick={() => aoMudar(id)} aria-pressed={valor === id}
+          className={`rounded-full border px-3 py-1 text-xs font-medium ${valor === id ? 'border-primary bg-accent text-primary' : 'text-muted-foreground hover:bg-muted'}`}>
+          {texto}{typeof n === 'number' ? <span className="tabular-nums"> ({n})</span> : null}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ItemMaisVendido({ p, posicao, tipo }) {
+  const sinais = [
+    typeof p.vendas_mes === 'number' ? `${inteiro(p.vendas_mes)} ${tipo === 'joompro' ? 'vendas/mês do equivalente no ML' : (tipo.startsWith('shopee') ? 'vendas em 30 dias' : 'vendas/mês (média)')}` : '',
+    typeof p.preco === 'number' ? `${tipo === 'joompro' ? 'custo no Brasil ' : ''}${reais(p.preco)}` : '',
+    tipo === 'joompro' && typeof p.preco_ml === 'number' ? `vende a ${reais(p.preco_ml)} no ML` : '',
+    tipo === 'joompro' && p.pedido_minimo ? `pedido mínimo ${inteiro(p.pedido_minimo)} un.` : '',
+    typeof p.nota === 'number' && p.avaliacoes ? `nota ${p.nota} (${inteiro(p.avaliacoes)})` : '',
+  ].filter(Boolean).join(' · ');
+  return (
+    <li className="flex items-start gap-3 rounded-lg border p-2.5">
+      <span className="w-6 shrink-0 pt-0.5 text-right text-xs font-semibold text-muted-foreground tabular-nums">{posicao}º</span>
+      <Foto src={p.foto} />
+      <div className="min-w-0 text-sm">
+        <div className="break-words"><Nome nome={p.titulo} link={p.link} /></div>
+        <div className="text-xs text-muted-foreground">{sinais}{p.subcategoria ? ` · ${p.subcategoria}` : ''}</div>
+        <div className="mt-1 flex flex-wrap gap-1">
+          {p.genero && p.genero !== 'Sem gênero' && <Selo tom="primario">{p.genero}</Selo>}
+          {p.origem && p.origem !== 'Não identificada' && <Selo>{p.origem}</Selo>}
+          {p.marca && <Selo>marca {p.marca}</Selo>}
+          {p.tendencia === 'subindo' && <Selo tom="ok">subindo</Selo>}
+          {typeof p.semelhanca === 'number' && <Selo>semelhança {p.semelhanca.toFixed(2)} · conferir o par</Selo>}
+          {(p.regulatorio || []).map((r) => <Selo key={r.orgao} tom="alerta">{r.orgao}</Selo>)}
+          {p.link_ml && linkSeguro(p.link_ml) && <a className="text-xs underline-offset-2 hover:text-primary hover:underline" href={p.link_ml} target="_blank" rel="noopener noreferrer">ver no ML</a>}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+// tipoFixo: mostra so um marketplace (telas da Compra Internacional); origemFixa: China ou Estados Unidos.
+function MaisVendidos({ tipoFixo, origemFixa }) {
+  const { dados: d, erro, carregando } = useDados(carregarMaisVendidos, 0);
+  const [aba, setAba] = useState(tipoFixo || 'ml');
+  const [genero, setGenero] = useState('todos');
+  const [aberta, setAberta] = useState(null);
+  const casa = useBusca();
+  const mp = d && d.marketplaces && d.marketplaces[tipoFixo || aba];
+  const base = mp ? mp.itens.filter((p) => !origemFixa || p.origem === origemFixa).filter((p) => casa(p.titulo, p.categoria, p.subcategoria, p.marca)) : [];
+  const contagem = (g) => base.filter((p) => g === 'todos' || p.genero === g).length;
+  const itens = base.filter((p) => genero === 'todos' || p.genero === genero);
+  const grupos = [];
+  for (const p of itens) {
+    let g = grupos.find((x) => x.categoria === p.categoria);
+    if (!g) { g = { categoria: p.categoria, itens: [], vendas: 0 }; grupos.push(g); }
+    g.itens.push(p);
+    g.vendas += p.vendas_mes || 0;
+  }
+  grupos.sort((a, b) => b.vendas - a.vendas);
+  return (
+    <>
+      <Card className="mb-4">
+        <CardTitulo
+          titulo={origemFixa ? `Mais vendidos da Compra Internacional · ${origemFixa}` : 'Mais vendidos por categoria'}
+          descricao={`${d ? d.aviso : ''}${mp ? ` Leitura de ${hora(mp.consultado_em)}.` : ''}${tipoFixo === 'ml-internacional' ? ' Origem pela loja informada pelo JoomPulse ou pelo cadastro do vendedor (prefixo CN = China, final BRF = EUA).' : ''}${(tipoFixo || aba) === 'joompro' ? ' Fornecedores da China (catálogo JoomPro, fotos do Alibaba/1688) ordenados pelas vendas do produto equivalente no Mercado Livre; o par é automático: confira antes de comprar.' : ''}`}
+        />
+        <Estado erro={erro} carregando={carregando} dados={d} />
+        {d && !mp && <p className="text-sm text-muted-foreground">Ainda sem leitura deste marketplace. Peça a atualização ao Claude.</p>}
+        <div className="grid gap-3">
+          {!tipoFixo && d && (
+            <Chips rotulo="Marketplace" valor={aba} aoMudar={(v) => { setAba(v); setAberta(null); }}
+              opcoes={ABAS_MAIS_VENDIDOS.filter(([id]) => d.marketplaces[id]).map(([id, t]) => [id, t, d.marketplaces[id].itens.length])} />
+          )}
+          {mp && (
+            <Chips rotulo="Gênero" valor={genero} aoMudar={setGenero}
+              opcoes={[['todos', 'Todos', contagem('todos')]].concat(d.generos.map((g) => [g, g, contagem(g)]))} />
+          )}
+        </div>
+      </Card>
+      {mp && !grupos.length && <Card><p className="text-sm text-muted-foreground">Nenhum produto com esse filtro.</p></Card>}
+      <div className="grid gap-3">
+        {grupos.map((g) => {
+          const abrir = aberta === g.categoria || grupos.length === 1;
+          return (
+            <Card key={g.categoria}>
+              <button className="flex w-full items-center gap-3 text-left" onClick={() => setAberta(abrir ? null : g.categoria)} aria-expanded={abrir}>
+                <div className="mr-auto min-w-0">
+                  <h2 className="text-base font-semibold">{g.categoria}</h2>
+                  <p className="text-xs text-muted-foreground">{g.itens.length} produtos · {inteiro(g.vendas)} vendas somadas (estimativa)</p>
+                </div>
+                <div className="hidden -space-x-2 sm:flex">{g.itens.slice(0, 4).map((p) => <Foto key={p.id} src={p.foto} />)}</div>
+                <span className="text-xs text-primary">{abrir ? 'fechar' : 'ver'}</span>
+              </button>
+              {abrir && <ul className="mt-3 grid gap-2 lg:grid-cols-2">{g.itens.map((p, i) => <ItemMaisVendido key={p.id} p={p} posicao={i + 1} tipo={tipoFixo || aba} />)}</ul>}
+            </Card>
+          );
+        })}
+      </div>
     </>
   );
 }
@@ -1075,6 +1194,7 @@ const TODAS_AS_TELAS = [
   ['importados', 'Importados → Brasil', Ship, Importados, 'O que o Brasil compra da China e dos EUA, no Mercado Livre e na Shopee', 'Visão geral'],
   ['painel', 'Painel', LayoutDashboard, Painel, 'Mineração ao vivo e resumo do dia', 'Visão geral'],
   ['alta', 'Em alta', TrendingUp, EmAlta, 'Produtos aptos que subiram no ranking do Mercado Livre', 'Visão geral'],
+  ['mais-vendidos', 'Mais vendidos', TrendingUp, () => <MaisVendidos />, 'Por marketplace e categoria, com filtro por gênero', 'Marketplaces'],
   ['ml', 'Mercado Livre · Brasil', Store, MercadoLivreBrasil, 'Ranking do Mercado Livre Brasil: a demanda que a Compra Internacional atende', 'Marketplaces'],
   ['ml-mx', 'Mercado Libre · México', Store, MercadoLivreMexico, 'Ranking do Mercado Libre México, com preços em pesos', 'Marketplaces'],
   ['ml-china', 'ML Internacional · China', Globe, InternacionalChina, 'Mercado Livre, Compra Internacional com envio da China', 'Marketplaces'],
@@ -1089,7 +1209,7 @@ const TODAS_AS_TELAS = [
   ['pedidos', 'Pedidos ao Claude', Bot, Pedidos, 'Fila do que só o Claude executa', 'Operação'],
   ['integracoes', 'Integrações', Plug, Integracoes, 'Situação de cada ligação', 'Operação'],
 ];
-const COM_BUSCA = new Set(['ml', 'ml-mx', 'shopee', 'china', 'alibaba', 'amazon']);
+const COM_BUSCA = new Set(['mais-vendidos', 'ml-china', 'ml-eua', 'ml', 'ml-mx', 'shopee', 'china', 'alibaba', 'amazon']);
 // Pedidos e Integracoes falam com o backend deste computador; na versao hospedada ficam de fora.
 const TELAS = TODAS_AS_TELAS.filter(([id]) => !comSupabase || !['atendimento', 'pedidos', 'integracoes'].includes(id));
 const GRUPOS = [...new Set(TELAS.map((t) => t[5]))];

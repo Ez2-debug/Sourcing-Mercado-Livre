@@ -871,3 +871,30 @@ test('Compras Paraguai: le os mais buscados, ignora patrocinados e conta os dias
   await atualizarComprasParaguai(async () => { chamou = true; return { ok: true, text: async () => '' }; }, new Date('2026-11-02T20:00:00Z'));
   assert.equal(chamou, false, 'uma leitura por dia');
 });
+
+test('mais vendidos: genero pelo titulo, origem pelo vendedor e grupos por categoria', () => {
+  const { generoDe, gravarMaisVendidos, lerMaisVendidos, origemPeloVendedor } = require('../server/maisvendidos');
+  assert.equal(generoDe('Vestido Longo Feminino'), 'Feminino');
+  assert.equal(generoDe('Tênis Corrida Masculino e Feminino'), 'Unissex');
+  assert.equal(generoDe('Pijama Kigurumi Infantil Menina'), 'Infantil');
+  assert.equal(generoDe('Furadeira de Impacto'), 'Sem gênero');
+  assert.equal(origemPeloVendedor('CNSHENZHENSHIXIAODONGJIBRR'), 'China');
+  assert.equal(origemPeloVendedor('USGLOBALAXISGROUPBRF'), 'Estados Unidos');
+  assert.equal(origemPeloVendedor('LOJA TESTE'), undefined);
+  const colunas = ['productId', 'buyBoxItemId', 'title', 'brand', 'categoryL1Name', 'categoryL2Name', 'sales1m', 'buyBoxPrice', 'imageUrl', 'meliUrl', 'isInternational'];
+  const resposta = (linhas) => JSON.stringify({ columns: colunas, data: linhas });
+  const agora = new Date('2026-11-02T12:00:00Z');
+  gravarMaisVendidos('ml-internacional', resposta([
+    ['MLB901', 'MLB9011', 'Tênis Corrida Feminino', 'GENERIC', 'Calçados', 'Tênis', 900, 99, null, null, true],
+    ['MLB902', 'MLB9022', 'Kit Potes Cozinha', null, 'Casa', 'Cozinha', 500, 40, null, null, true],
+    ['MLB903', 'MLB9033', 'Sandália Masculina', null, 'Calçados', 'Sandálias', 300, 50, null, null, true],
+  ]), agora);
+  gravarMaisVendidos('ml-internacional-itens', JSON.stringify({ columns: ['productId', 'itemId', 'sellerName'], data: [['MLB902', 'MLB9022', 'CNYIWUBRR']] }), agora);
+  const mv = lerMaisVendidos().marketplaces['ml-internacional'];
+  const calcados = mv.categorias.find((c) => c.categoria === 'Calçados');
+  assert.ok(calcados.quantidade >= 2 && calcados.vendas_mes >= 1200, 'os dois calcados no mesmo grupo');
+  assert.ok(mv.categorias.findIndex((c) => c.categoria === 'Calçados') < mv.categorias.findIndex((c) => c.categoria === 'Casa'), 'categoria que mais vende primeiro');
+  assert.equal(mv.itens.find((x) => x.id === 'MLB902').origem, 'China');
+  assert.equal(mv.itens.find((x) => x.id === 'MLB901').genero, 'Feminino');
+  assert.equal(mv.itens.find((x) => x.id === 'MLB901').marca, undefined, 'GENERIC nao e marca');
+});

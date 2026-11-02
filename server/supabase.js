@@ -184,6 +184,8 @@ async function sincronizarRetratos() {
     if (tendencias) linhas.push({ chave: 'tendencias', atualizado_em: agora, dados: tendencias });
     const cambio = require('./cambio').cambioGuardado();
     if (cambio) linhas.push({ chave: 'cambio', atualizado_em: agora, dados: cambio });
+    const maisVendidos = require('./maisvendidos').lerMaisVendidos();
+    if (maisVendidos) linhas.push({ chave: 'mais-vendidos', atualizado_em: agora, dados: maisVendidos });
     const compras = require('./comprasparaguai').lerComprasParaguai();
     if (compras) linhas.push({ chave: 'compras-paraguai', atualizado_em: agora, dados: { ...compras, historico: undefined } });
     const traducoes = require('./traducao').lerTraducoes();
