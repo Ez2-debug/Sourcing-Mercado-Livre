@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
   Activity, ArrowDownRight, ArrowUpRight, BookOpenText, Bot, CheckCircle2, CircleAlert, ClipboardList, Download, FileSpreadsheet,
-  Factory, Globe, Headset, Radar as IconeRadar, Sparkles, LayoutDashboard, PackageSearch, RefreshCw, Search, Ship, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
+  Factory, Globe, Headset, Radar as IconeRadar, LayoutDashboard, CircleHelp, PackageSearch, RefreshCw, Search, Ship, Minus, Package, Pause, Pickaxe, Play, Plug, ShoppingBag, Store, TrendingUp,
 } from 'lucide-react';
 import {
   COTACAO_URL, carregarCotacoesCompletas, carregarEmAlta, carregarAmazon, carregarCambio, carregarIntegracoes, carregarRadar, carregarInternacional, carregarMaisVendidos, carregarJoompro, carregarSuportify, carregarPacote, carregarPacotes, carregarPedidos, carregarProdutos,
@@ -11,6 +11,7 @@ import { Aviso, Botao, Card, CardTitulo, Carregando, Indicador, Selo, Tabela } f
 import { TIPOS_DE_RAZAO, faixaDePreco, montarRazao } from './razao.js';
 import { baixarPlanilha } from './planilha.js';
 import { CATEGORIAS, categoriaAmpla } from './categorias.js';
+import { ComoFunciona, JanelaDeAjuda } from './ajuda.jsx';
 
 /* ------------------------------------------------------------------ */
 /* Apoio                                                               */
@@ -95,10 +96,14 @@ function Estado({ erro, carregando, dados }) {
 function Marca({ sub }) {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="grid size-8 place-items-center rounded-lg bg-linear-to-br from-primary to-[oklch(0.55_0.2_300)] text-sm font-bold text-white shadow-sm">C</span>
+      {/* Um conteiner visto de lado: a marca do trabalho, sem enfeite. */}
+      <svg viewBox="0 0 32 32" className="size-8 shrink-0 text-primary" aria-hidden="true">
+        <rect x="2" y="8" width="28" height="16" rx="1.5" fill="none" stroke="currentColor" strokeWidth="2" />
+        <path d="M8 11v10M12.5 11v10M17 11v10M21.5 11v10M26 11v10" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
       <span className="leading-tight">
-        <span className="block text-sm font-semibold tracking-tight">Conecta Market Sourcing</span>
-        <span className="block text-xs text-muted-foreground">{sub}</span>
+        <span className="block text-[15px] font-semibold tracking-tight">Conecta <span className="font-normal">Market Sourcing</span></span>
+        <span className="block font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">{sub}</span>
       </span>
     </div>
   );
@@ -500,7 +505,7 @@ function CartaoDoMercado({ m, itens }) {
         <span className="text-xs text-muted-foreground tabular-nums">{itens.length}</span>
         {(m.aviso || m.fonte) && (
           <button onClick={() => setInfo(!info)} aria-expanded={info} aria-label="Sobre esta fonte"
-            className="grid size-6 place-items-center rounded-full text-xs text-muted-foreground hover:bg-muted">i</button>
+            className="grid size-6 place-items-center rounded-sm border text-xs text-muted-foreground hover:bg-muted">i</button>
         )}
       </div>
       {info && <p className="mb-2 rounded-md bg-muted p-2 text-xs text-muted-foreground">{[m.fonte, m.aviso].filter(Boolean).join('. ')}</p>}
@@ -546,7 +551,7 @@ function Radar() {
             <div className="flex flex-wrap gap-1.5">
               {opcoes.slice(0, 6).map((c) => (
                 <button key={c} onClick={() => setCategoria(categoria === c ? 'todas' : c)} aria-pressed={categoria === c}
-                  className={`rounded-full border px-3 py-1 text-xs ${categoria === c ? 'border-primary bg-accent text-primary' : 'text-muted-foreground hover:bg-muted'}`}>{c}</button>
+                  className={`rounded-sm border px-3 py-1 text-xs ${categoria === c ? 'border-primary bg-accent text-primary' : 'text-muted-foreground hover:bg-muted'}`}>{c}</button>
               ))}
             </div>
           </div>
@@ -584,7 +589,7 @@ function Chips({ opcoes, valor, aoMudar, rotulo }) {
       <span className="mr-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">{rotulo}</span>
       {opcoes.map(([id, texto, n]) => (
         <button key={id} onClick={() => aoMudar(id)} aria-pressed={valor === id}
-          className={`rounded-full border px-3 py-1 text-xs font-medium ${valor === id ? 'border-primary bg-accent text-primary' : 'text-muted-foreground hover:bg-muted'}`}>
+          className={`rounded-sm border px-3 py-1 text-xs font-medium ${valor === id ? 'border-primary bg-accent text-primary' : 'text-muted-foreground hover:bg-muted'}`}>
           {texto}{typeof n === 'number' ? <span className="tabular-nums"> ({n})</span> : null}
         </button>
       ))}
@@ -1243,6 +1248,7 @@ function Integracoes() {
 /* ------------------------------------------------------------------ */
 
 const TODAS_AS_TELAS = [
+  ['como-funciona', 'Como funciona', CircleHelp, ComoFunciona, 'O caminho de um produto, as fontes e como ler os números', 'Visão geral'],
   ['radar', 'Radar de tendências', IconeRadar, Radar, 'O que está em alta em cada mercado, com a fonte de cada sinal', 'Visão geral'],
   ['importados', 'Importados → Brasil', Ship, Importados, 'O que o Brasil compra da China e dos EUA, no Mercado Livre e na Shopee', 'Visão geral'],
   ['painel', 'Painel', LayoutDashboard, Painel, 'Mineração ao vivo e resumo do dia', 'Visão geral'],
@@ -1271,6 +1277,9 @@ export default function App() {
   const [sessao, setSessao] = useState(undefined);
   const [tela, setTela] = useState('radar');
   const [busca, setBusca] = useState('');
+  // A janela de ajuda abre sozinha so na primeira visita deste navegador.
+  const [ajuda, setAjuda] = useState(() => { try { return !localStorage.getItem('cms-ajuda-vista'); } catch (_) { return false; } });
+  const fecharAjuda = useCallback(() => { setAjuda(false); try { localStorage.setItem('cms-ajuda-vista', '1'); } catch (_) { /* sem armazenamento */ } }, []);
 
   useEffect(() => {
     if (!comSupabase) return undefined;
@@ -1285,8 +1294,8 @@ export default function App() {
   const [, titulo, , Tela, subtitulo] = TELAS.find(([id]) => id === tela);
   return (
     <div className="min-h-screen md:grid md:grid-cols-[232px_1fr]">
-      <aside className="border-b bg-sidebar p-3 md:sticky md:top-0 md:h-screen md:border-r md:border-b-0">
-        <div className="px-2 py-2"><Marca sub="Sourcing para importação" /></div>
+      <aside className="barra border-b bg-sidebar p-3 md:sticky md:top-0 md:h-screen md:border-r md:border-b-0">
+        <div className="px-2 py-2"><Marca sub="Mesa de importação" /></div>
         <nav className="mt-2 flex gap-1 overflow-x-auto md:mt-3 md:block md:max-h-[calc(100vh-150px)] md:overflow-x-visible md:overflow-y-auto" aria-label="Seções">
           {GRUPOS.map((grupo) => (
             <div key={grupo} className="contents md:mb-3 md:block">
@@ -1307,11 +1316,14 @@ export default function App() {
         </div>
       </aside>
       <div className="min-w-0">
-        <header className="flex flex-wrap items-center gap-3 border-b bg-card/60 px-4 py-4 backdrop-blur md:sticky md:top-0 md:z-10 md:px-8">
+        <header className="flex flex-wrap items-center gap-3 border-b bg-background px-4 py-4 md:sticky md:top-0 md:z-10 md:px-8">
           <div className="mr-auto min-w-0">
             <h1 className="text-xl font-semibold tracking-tight">{titulo}</h1>
             <p className="text-sm text-muted-foreground">{subtitulo}</p>
           </div>
+          <button onClick={() => setAjuda(true)} className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
+            <CircleHelp className="size-4" aria-hidden="true" />Como funciona
+          </button>
           {COM_BUSCA.has(tela) && (
             <label className="relative block w-full sm:w-72">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
@@ -1325,6 +1337,7 @@ export default function App() {
           A API do Mercado Livre informa posição no ranking, não quantidade vendida. Vendas e faturamento, quando aparecem, são estimativas do JoomPulse. Preço do Alibaba é preço de anúncio, não cotação FOB.
         </footer>
       </div>
+      <JanelaDeAjuda aberta={ajuda} aoFechar={fecharAjuda} aoVerTudo={() => { fecharAjuda(); setTela('como-funciona'); }} />
     </div>
   );
 }

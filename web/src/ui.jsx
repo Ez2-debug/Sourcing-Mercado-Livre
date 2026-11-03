@@ -6,7 +6,7 @@ import React from 'react';
 const junta = (...partes) => partes.filter(Boolean).join(' ');
 
 export function Card({ className, children }) {
-  return <section className={junta('rounded-lg border bg-card p-5 shadow-xs', className)}>{children}</section>;
+  return <section className={junta('rounded-lg border bg-card p-5', className)}>{children}</section>;
 }
 
 export function CardTitulo({ titulo, descricao, acao }) {
@@ -50,12 +50,12 @@ const TONS = {
 };
 
 export function Selo({ tom = 'neutro', className, children }) {
-  return <span className={junta('inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums', TONS[tom], className)}>{children}</span>;
+  return <span className={junta('inline-flex items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-[11px] font-medium tabular-nums', TONS[tom], className)}>{children}</span>;
 }
 
 export function Indicador({ rotulo, valor, nota, icone: Icone }) {
   return (
-    <div className="rounded-lg border bg-card p-4 shadow-xs">
+    <div className="rounded-lg border bg-card p-4">
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>{rotulo}</span>
         {Icone && <Icone className="size-4" aria-hidden="true" />}
