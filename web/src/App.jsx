@@ -10,6 +10,7 @@ import {
 import { Aviso, Botao, Card, CardTitulo, Carregando, Indicador, Selo, Tabela } from './ui.jsx';
 import { TIPOS_DE_RAZAO, faixaDePreco, montarRazao } from './razao.js';
 import { baixarPlanilha } from './planilha.js';
+import { CATEGORIAS, categoriaAmpla } from './categorias.js';
 
 /* ------------------------------------------------------------------ */
 /* Apoio                                                               */
@@ -473,52 +474,92 @@ const MercadoLivreMexico = () => <MercadoLivre site="MLM" />;
 /* ------------------------------------------------------------------ */
 
 function ItemDoRadar({ item }) {
+  const valor = typeof item.preco === 'number' ? dinheiro(item.preco, item.moeda) : (item.valor_usd ? `US$ ${inteiro(item.valor_usd)}` : '');
   return (
-    <li className="flex items-start gap-3">
-      {item.foto ? <Foto src={item.foto} /> : null}
-      <div className="min-w-0 text-sm">
-        <div className="break-words">{item.link ? <Nome nome={item.titulo} link={item.link} /> : <span className="font-medium">{item.titulo}</span>}{item.codigo ? <span className="text-xs text-muted-foreground"> · SH {item.codigo}</span> : null}</div>
-        <div className="text-xs text-muted-foreground">{[item.sinal, typeof item.preco === 'number' ? dinheiro(item.preco, item.moeda) : '', item.valor_usd ? `US$ ${inteiro(item.valor_usd)} importados` : '', item.detalhe].filter(Boolean).join(' · ')}</div>
+    <li className="flex items-center gap-3 py-2">
+      {item.foto ? <Foto src={item.foto} /> : <div className="grid size-12 shrink-0 place-items-center rounded-md bg-muted text-[10px] text-muted-foreground">{item.codigo ? `NCM ${item.codigo.slice(0, 5)}` : '—'}</div>}
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium" title={item.titulo}>{item.link ? <Nome nome={item.titulo} link={item.link} /> : item.titulo}</div>
+        <div className="truncate text-xs text-muted-foreground" title={item.sinal}>{item.sinal}</div>
       </div>
+      {valor && <div className="shrink-0 text-right text-sm font-semibold tabular-nums">{valor}</div>}
     </li>
+  );
+}
+
+// Um mercado do radar: 5 produtos e o resto atras de "ver todos".
+function CartaoDoMercado({ m, itens }) {
+  const [todos, setTodos] = useState(false);
+  const [info, setInfo] = useState(false);
+  const mostrar = todos ? itens : itens.slice(0, 5);
+  return (
+    <Card className="flex flex-col p-4">
+      <div className="mb-1 flex items-center gap-2">
+        <h2 className="mr-auto truncate text-sm font-semibold">{m.mercado}</h2>
+        {m.pendente && <Selo tom="alerta">aguardando</Selo>}
+        <span className="text-xs text-muted-foreground tabular-nums">{itens.length}</span>
+        {(m.aviso || m.fonte) && (
+          <button onClick={() => setInfo(!info)} aria-expanded={info} aria-label="Sobre esta fonte"
+            className="grid size-6 place-items-center rounded-full text-xs text-muted-foreground hover:bg-muted">i</button>
+        )}
+      </div>
+      {info && <p className="mb-2 rounded-md bg-muted p-2 text-xs text-muted-foreground">{[m.fonte, m.aviso].filter(Boolean).join('. ')}</p>}
+      {mostrar.length > 0
+        ? <ul className="divide-y">{mostrar.map((p) => <ItemDoRadar key={p.titulo + (p.link || p.codigo || '')} item={p} />)}</ul>
+        : <p className="py-4 text-sm text-muted-foreground">Nada nesta categoria.</p>}
+      {itens.length > 5 && (
+        <button onClick={() => setTodos(!todos)} className="mt-2 self-start text-xs font-medium text-primary hover:underline">
+          {todos ? 'mostrar menos' : `ver todos (${itens.length})`}
+        </button>
+      )}
+    </Card>
   );
 }
 
 function Radar() {
   const { dados: d, erro, carregando } = useDados(carregarRadar, 0);
+  const [categoria, setCategoria] = useState('todas');
+  const daCategoria = (p) => categoria === 'todas' || categoriaAmpla(p.detalhe, p.titulo) === categoria;
+  const mercados = d ? d.mercados.map((m) => ({ m, itens: [...(m.produtos || []), ...(m.categorias || [])].filter(daCategoria) })) : [];
+  const cruzados = d ? d.cruzados.filter(daCategoria) : [];
+  // So as categorias que tem produto nesta leitura, com a contagem.
+  const contagem = {};
+  if (d) for (const m of d.mercados) for (const p of [...(m.produtos || []), ...(m.categorias || []), ...d.cruzados]) {
+    const c = categoriaAmpla(p.detalhe, p.titulo);
+    contagem[c] = (contagem[c] || 0) + 1;
+  }
+  const opcoes = CATEGORIAS.filter((c) => contagem[c]);
   return (
     <>
       <Estado erro={erro} carregando={carregando} dados={d} />
       {d && (
         <>
-          <Card className="mb-4">
-            <CardTitulo titulo="Sinais em mais de um mercado" descricao={d.aviso} />
-            {!d.cruzados.length && <p className="text-sm text-muted-foreground">Nenhum sinal repetido entre mercados nesta leitura.</p>}
-            <ul className="grid gap-3 md:grid-cols-2">{d.cruzados.map((c) => <ItemDoRadar key={c.titulo} item={c} />)}</ul>
-          </Card>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,360px),1fr))] gap-4">
-            {d.mercados.map((m) => (
-              <Card key={m.id}>
-                <div className="mb-3 flex items-start gap-2">
-                  <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-                  <div className="mr-auto min-w-0"><h2 className="text-base font-semibold">{m.mercado}</h2><p className="text-xs text-muted-foreground">{m.fonte}</p></div>
-                  {m.pendente && <Selo tom="alerta">aguardando credencial</Selo>}
-                </div>
-                {m.aviso && <p className="mb-3 text-xs text-muted-foreground">{m.aviso}</p>}
-                {m.produtos && m.produtos.length > 0 && <ul className="mb-3 grid gap-2.5">{m.produtos.map((p) => <ItemDoRadar key={p.titulo + (p.link || '')} item={p} />)}</ul>}
-                {m.categorias && m.categorias.length > 0 && <ul className="mb-3 grid gap-2.5">{m.categorias.map((c) => <ItemDoRadar key={c.codigo} item={c} />)}</ul>}
-                {m.termos && m.termos.length > 0 && (
-                  <div>
-                    <div className="mb-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{m.rotuloDosTermos || 'Mais buscados'}</div>
-                    <div className="flex flex-wrap gap-1.5">{m.termos.map((t) => (linkSeguro(t.link)
-                      ? <a key={t.termo} href={t.link} target="_blank" rel="noopener noreferrer" className="rounded-full border px-2.5 py-0.5 text-xs hover:bg-muted">{t.termo}{t.extra ? <span className="text-muted-foreground"> · {t.extra}</span> : null}</a>
-                      : <span key={t.termo} className="rounded-full border px-2.5 py-0.5 text-xs">{t.termo}{t.extra ? <span className="text-muted-foreground"> · {t.extra}</span> : null}</span>))}</div>
-                  </div>
-                )}
-                {!((m.produtos || []).length || (m.categorias || []).length || (m.termos || []).length) && <p className="text-sm text-muted-foreground">Sem dados nesta leitura.</p>}
-              </Card>
-            ))}
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Categoria</span>
+              <select value={categoria} onChange={(e) => setCategoria(e.target.value)}
+                className="h-9 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40">
+                <option value="todas">Todas</option>
+                {opcoes.map((c) => <option key={c} value={c}>{c} ({contagem[c]})</option>)}
+              </select>
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {opcoes.slice(0, 6).map((c) => (
+                <button key={c} onClick={() => setCategoria(categoria === c ? 'todas' : c)} aria-pressed={categoria === c}
+                  className={`rounded-full border px-3 py-1 text-xs ${categoria === c ? 'border-primary bg-accent text-primary' : 'text-muted-foreground hover:bg-muted'}`}>{c}</button>
+              ))}
+            </div>
           </div>
+          {cruzados.length > 0 && (
+            <Card className="mb-4 p-4">
+              <h2 className="mb-1 text-sm font-semibold">Em alta em mais de um mercado</h2>
+              <ul className="grid divide-y md:grid-cols-2 md:gap-x-6 md:divide-y-0">{cruzados.map((c) => <ItemDoRadar key={c.titulo} item={c} />)}</ul>
+            </Card>
+          )}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {mercados.filter(({ m, itens }) => itens.length || (categoria === 'todas' && m.pendente)).map(({ m, itens }) => <CartaoDoMercado key={m.id} m={m} itens={itens} />)}
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground">{d.aviso}</p>
         </>
       )}
     </>
@@ -586,11 +627,13 @@ function MaisVendidos({ tipoFixo, origemFixa }) {
   const [aba, setAba] = useState(tipoFixo || 'ml');
   const [genero, setGenero] = useState('todos');
   const [aberta, setAberta] = useState(null);
+  const [cat, setCat] = useState('todas');
   const casa = useBusca();
   const mp = d && d.marketplaces && d.marketplaces[tipoFixo || aba];
   const base = mp ? mp.itens.filter((p) => !origemFixa || p.origem === origemFixa).filter((p) => casa(p.titulo, p.categoria, p.subcategoria, p.marca)) : [];
   const contagem = (g) => base.filter((p) => g === 'todos' || p.genero === g).length;
-  const itens = base.filter((p) => genero === 'todos' || p.genero === genero);
+  const nomesDasCategorias = [...new Set(base.map((p) => p.categoria))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const itens = base.filter((p) => genero === 'todos' || p.genero === genero).filter((p) => cat === 'todas' || p.categoria === cat);
   const grupos = [];
   for (const p of itens) {
     let g = grupos.find((x) => x.categoria === p.categoria);
@@ -610,12 +653,22 @@ function MaisVendidos({ tipoFixo, origemFixa }) {
         {d && !mp && <p className="text-sm text-muted-foreground">Ainda sem leitura deste marketplace. Peça a atualização ao Claude.</p>}
         <div className="grid gap-3">
           {!tipoFixo && d && (
-            <Chips rotulo="Marketplace" valor={aba} aoMudar={(v) => { setAba(v); setAberta(null); }}
+            <Chips rotulo="Marketplace" valor={aba} aoMudar={(v) => { setAba(v); setAberta(null); setCat('todas'); }}
               opcoes={ABAS_MAIS_VENDIDOS.filter(([id]) => d.marketplaces[id]).map(([id, t]) => [id, t, d.marketplaces[id].itens.length])} />
           )}
           {mp && (
             <Chips rotulo="Gênero" valor={genero} aoMudar={setGenero}
               opcoes={[['todos', 'Todos', contagem('todos')]].concat(d.generos.map((g) => [g, g, contagem(g)]))} />
+          )}
+          {mp && (
+            <label className="flex items-center gap-2 text-sm">
+              <span className="mr-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">Categoria</span>
+              <select value={cat} onChange={(e) => { setCat(e.target.value); setAberta(e.target.value === 'todas' ? null : e.target.value); }}
+                className="h-9 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40">
+                <option value="todas">Todas ({nomesDasCategorias.length})</option>
+                {nomesDasCategorias.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </label>
           )}
         </div>
       </Card>
