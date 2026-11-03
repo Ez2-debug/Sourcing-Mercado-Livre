@@ -285,9 +285,39 @@ function perspectivas(ml, shopee, agora) {
   };
 }
 
+function daBuscaNova() {
+  const mv = require('./maisvendidos');
+  const pais = { China: 'CN', 'Estados Unidos': 'US' };
+  const tudo = mv.lerMaisVendidos();
+  const ml = mv.lerTipo('ml-internacional');
+  const sh = mv.lerTipo('shopee-internacional');
+  const itensMl = tudo && tudo.marketplaces['ml-internacional'] ? tudo.marketplaces['ml-internacional'].itens.filter((x) => pais[x.origem]) : [];
+  return {
+    ml: ml && itensMl.length ? {
+      fonte: 'JoomPulse (busca de mais vendidos)', consultado_em: ml.consultado_em, aviso: AVISO,
+      itens: itensMl.map((x) => ({
+        id: x.item_id || x.id, nome: x.titulo, foto: x.foto, categoria: [x.categoria, x.subcategoria].filter(Boolean).join(' > '),
+        marca: x.marca, classe_marca: x.marca ? 'conhecida' : 'sem_marca', pais_da_loja: pais[x.origem], origem: x.origem,
+        preco: x.preco, pedidos_mes: x.vendas_mes, faturamento_mes: x.faturamento_mes, avaliacoes: x.avaliacoes, nota: x.nota,
+        link: x.link, regulatorio: x.regulatorio,
+      })),
+    } : null,
+    shopee: sh ? {
+      fonte: 'JoomPulse (busca de mais vendidos)', consultado_em: sh.consultado_em, aviso: AVISO,
+      itens: sh.itens.map((x) => ({
+        id: x.id, nome: x.titulo, categoria: [x.categoria, x.subcategoria].filter(Boolean).join(' > '), local_da_loja: 'Internacional',
+        tem_marca: Boolean(x.marca), marca: x.marca, preco: x.preco, foto: x.foto, link: x.link, vendas_30_dias: x.vendas_mes,
+        tendencia: x.tendencia, avaliacoes: x.avaliacoes, nota: x.nota,
+      })),
+    } : null,
+  };
+}
+
 function lerInternacional(agora) {
-  const ml = maisRecente('ml');
-  const shopee = maisRecente('shopee');
+  const { maisNova } = require('./maisvendidos');
+  const nova = daBuscaNova();
+  const ml = maisNova(maisRecente('ml'), nova.ml);
+  const shopee = maisNova(maisRecente('shopee'), nova.shopee);
   if (!ml && !shopee) return null;
   return perspectivas(ml, shopee, agora);
 }

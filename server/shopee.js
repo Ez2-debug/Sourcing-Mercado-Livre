@@ -129,8 +129,32 @@ function lerRelacionados() {
   }
 }
 
-// A leitura mais recente, ou null quando ainda nao ha nenhuma.
+// A busca de mais vendidos (maisvendidos.js) no formato desta tela.
+function daBuscaNova() {
+  const { lerTipo } = require('./maisvendidos');
+  const d = lerTipo('shopee');
+  if (!d) return null;
+  return {
+    fonte: 'JoomPulse (busca de mais vendidos)', consultado_em: d.consultado_em, aviso: AVISO,
+    itens: d.itens.map((x) => ({
+      id: x.id, nome: x.titulo, categoria: [x.categoria, x.subcategoria].filter(Boolean).join(' > '), loja: x.loja,
+      local_da_loja: x.internacional ? 'Internacional' : undefined, tem_marca: Boolean(x.marca), marca: x.marca,
+      preco: x.preco, foto: x.foto, link: x.link, vendas_30_dias: x.vendas_mes, faturamento_30_dias: x.faturamento_mes,
+      tendencia: x.tendencia, avaliacoes: x.avaliacoes, nota: x.nota, genero: x.genero,
+    })),
+  };
+}
+
+// A leitura mais recente (antiga ou da busca nova), ou null quando nao ha nenhuma.
 function lerShopee() {
+  const { maisNova } = require('./maisvendidos');
+  const nova = daBuscaNova();
+  const antiga = lerShopeeAntiga();
+  const r = maisNova(antiga, nova);
+  return r ? { ...r, relacionados: lerRelacionados() } : null;
+}
+
+function lerShopeeAntiga() {
   let nomes;
   try {
     nomes = fs.readdirSync(pastaShopee()).filter((n) => /^shopee-\d{4}-\d{2}-\d{2}\.json$/.test(n)).sort();

@@ -247,4 +247,25 @@ function lerMaisVendidos() {
   };
 }
 
-module.exports = { TIPOS, generoDe, gravarMaisVendidos, lerMaisVendidos, origemPeloVendedor };
+// As buscas de uma atualizacao completa (7 chamadas ao JoomPulse), na ordem.
+// Cada uma diz a ferramenta, os argumentos e o tipo com que a resposta e gravada.
+const CONSULTAS = [
+  { tipo: 'ml', ferramenta: 'meli_search_products', argumentos: { country: 'BR', sort_by: 'sales1m', limit: 100, offset: 0, preset: 'full_info' } },
+  { tipo: 'ml', ferramenta: 'meli_search_products', argumentos: { country: 'BR', sort_by: 'sales1m', limit: 100, offset: 100, preset: 'full_info' } },
+  { tipo: 'ml-internacional', ferramenta: 'meli_search_products', argumentos: { country: 'BR', where: { isInternational: true }, sort_by: 'sales1m', limit: 100, offset: 0, preset: 'full_info' } },
+  { tipo: 'ml-internacional', ferramenta: 'meli_search_products', argumentos: { country: 'BR', where: { isInternational: true }, sort_by: 'sales1m', limit: 100, offset: 100, preset: 'full_info' } },
+  { tipo: 'ml-internacional-itens', ferramenta: 'meli_search_products', argumentos: { country: 'BR', group: 'item', where: { isInternational: true }, sort_by: 'sales1m', limit: 100, preset: 'full_info' } },
+  { tipo: 'shopee', ferramenta: 'shopee_search_products', argumentos: { country: 'BR', sort_by: 'itemSales1m', limit: 100, preset: 'full_info' } },
+  { tipo: 'shopee-internacional', ferramenta: 'shopee_search_products', argumentos: { country: 'BR', where: { isInternational: true }, sort_by: 'itemSales1m', limit: 100, preset: 'full_info' } },
+  { tipo: 'joompro', ferramenta: 'joompro_search_products', argumentos: { country: 'BR', where: { matchScore: { min: 0.9 }, hasMeliMatch: true }, sort_by: 'meliSales1m', limit: 100, preset: 'full_info' } },
+];
+
+// A leitura gravada de um tipo, como veio (sem juntar a leitura por pais).
+function lerTipo(tipo) {
+  return lerArquivo(`${tipo}.json`);
+}
+
+// Quem e mais novo entre duas leituras com consultado_em.
+const maisNova = (a, b) => (!a ? b : (!b ? a : (Date.parse(b.consultado_em) > Date.parse(a.consultado_em) ? b : a)));
+
+module.exports = { CONSULTAS, TIPOS, generoDe, gravarMaisVendidos, lerMaisVendidos, lerTipo, maisNova, origemPeloVendedor };

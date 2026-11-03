@@ -12,6 +12,7 @@ import { TIPOS_DE_RAZAO, faixaDePreco, montarRazao } from './razao.js';
 import { baixarPlanilha } from './planilha.js';
 import { CATEGORIAS, categoriaAmpla } from './categorias.js';
 import { ComoFunciona, JanelaDeAjuda } from './ajuda.jsx';
+import { agruparResultados, juntarFontes } from './buscaglobal.js';
 
 /* ------------------------------------------------------------------ */
 /* Apoio                                                               */
@@ -572,6 +573,47 @@ function Radar() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Busca em todas as fontes                                            */
+/* ------------------------------------------------------------------ */
+
+async function carregarTudoParaBusca() {
+  const [maisVendidos, produtos, radar] = await Promise.allSettled([carregarMaisVendidos(), carregarProdutos(), carregarRadar()]);
+  const v = (r) => (r.status === 'fulfilled' ? r.value : null);
+  return juntarFontes({ maisVendidos: v(maisVendidos), produtos: v(produtos), radar: v(radar) });
+}
+
+function BuscaGlobal({ busca }) {
+  const { dados: lista, erro, carregando } = useDados(carregarTudoParaBusca, 0);
+  const [fonte, setFonte] = useState('todas');
+  const grupos = lista && busca.trim() ? agruparResultados(lista, busca) : [];
+  const total = grupos.reduce((n, g) => n + g.itens.length, 0);
+  const mostrar = grupos.filter((g) => fonte === 'todas' || g.fonte === fonte);
+  return (
+    <>
+      <Estado erro={erro} carregando={carregando} dados={lista} />
+      {lista && !busca.trim() && <Card><p className="text-sm text-muted-foreground">Digite o nome de um produto na busca do topo.</p></Card>}
+      {lista && busca.trim() && (
+        <>
+          <p className="mb-3 text-sm text-muted-foreground"><span className="font-medium text-foreground">{total}</span> resultados para “{busca}” em {grupos.length} fontes. Todas as palavras precisam aparecer no nome ou na categoria.</p>
+          {grupos.length > 1 && (
+            <div className="mb-4 flex flex-wrap gap-1.5">
+              {[['todas', 'Todas', total]].concat(grupos.map((g) => [g.fonte, g.nome, g.itens.length])).map(([id, nome, n]) => (
+                <button key={id} onClick={() => setFonte(id)} aria-pressed={fonte === id}
+                  className={`rounded-sm border px-3 py-1 text-xs ${fonte === id ? 'border-primary bg-accent text-primary' : 'text-muted-foreground hover:bg-muted'}`}>{nome} <span className="tabular-nums">({n})</span></button>
+              ))}
+            </div>
+          )}
+          {!grupos.length && <Card><p className="text-sm text-muted-foreground">Nada encontrado. Tente uma palavra só, ou o nome no singular.</p></Card>}
+          <div className="grid gap-4 lg:grid-cols-2">
+            {mostrar.map((g) => <CartaoDoMercado key={g.fonte} m={{ mercado: g.nome }} itens={g.itens} />)}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Mais vendidos por categoria (todos os marketplaces)                 */
 /* ------------------------------------------------------------------ */
 
@@ -654,6 +696,7 @@ function MaisVendidos({ tipoFixo, origemFixa }) {
           titulo={origemFixa ? `Mais vendidos da Compra Internacional · ${origemFixa}` : 'Mais vendidos por categoria'}
           descricao={`${d ? d.aviso : ''}${mp ? ` Leitura de ${hora(mp.consultado_em)}.` : ''}${tipoFixo === 'ml-internacional' ? ' Origem pela loja informada pelo JoomPulse ou pelo cadastro do vendedor (prefixo CN = China, final BRF = EUA).' : ''}${(tipoFixo || aba) === 'joompro' ? ' Fornecedores da China (catálogo JoomPro, fotos do Alibaba/1688) ordenados pelas vendas do produto equivalente no Mercado Livre; o par é automático: confira antes de comprar.' : ''}`}
         />
+        {!comSupabase && <div className="mb-3"><PedirAoClaude pedido={{ tipo: 'mais-vendidos' }} rotulo="Pedir atualização ao Claude" /></div>}
         <Estado erro={erro} carregando={carregando} dados={d} />
         {d && !mp && <p className="text-sm text-muted-foreground">Ainda sem leitura deste marketplace. Peça a atualização ao Claude.</p>}
         <div className="grid gap-3">
@@ -1291,7 +1334,9 @@ export default function App() {
   if (comSupabase && sessao === undefined) return null;
   if (comSupabase && !sessao) return <Login />;
 
-  const [, titulo, , Tela, subtitulo] = TELAS.find(([id]) => id === tela);
+  const [, titulo, , Tela, subtitulo] = tela === 'busca'
+    ? [null, 'Busca em todas as fontes', null, null, 'Mercado Livre, Compra Internacional, Shopee, China e Paraguai']
+    : TELAS.find(([id]) => id === tela);
   return (
     <div className="min-h-screen md:grid md:grid-cols-[232px_1fr]">
       <aside className="barra border-b bg-sidebar p-3 md:sticky md:top-0 md:h-screen md:border-r md:border-b-0">
@@ -1324,15 +1369,17 @@ export default function App() {
           <button onClick={() => setAjuda(true)} className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
             <CircleHelp className="size-4" aria-hidden="true" />Como funciona
           </button>
-          {COM_BUSCA.has(tela) && (
-            <label className="relative block w-full sm:w-72">
+          {(
+            <label className="relative block w-full sm:w-80">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-              <input type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar produto, categoria ou código"
-                aria-label="Buscar nesta lista" className="h-9 w-full rounded-md border bg-background pr-3 pl-9 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+              <input type="search" value={busca} onChange={(e) => setBusca(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && busca.trim()) setTela('busca'); }}
+                placeholder={COM_BUSCA.has(tela) ? 'Filtrar esta lista · Enter busca em tudo' : 'Buscar produto em todos os marketplaces'}
+                aria-label="Buscar produto" className="h-9 w-full rounded-md border bg-background pr-3 pl-9 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
             </label>
           )}
         </header>
-        <main className="px-4 py-5 md:px-8"><Busca.Provider value={COM_BUSCA.has(tela) ? busca : ''}><Tela /></Busca.Provider></main>
+        <main className="px-4 py-5 md:px-8"><Busca.Provider value={COM_BUSCA.has(tela) ? busca : ''}>{tela === 'busca' ? <BuscaGlobal busca={busca} /> : <Tela />}</Busca.Provider></main>
         <footer className="px-4 pb-6 text-xs text-muted-foreground md:px-8">
           A API do Mercado Livre informa posição no ranking, não quantidade vendida. Vendas e faturamento, quando aparecem, são estimativas do JoomPulse. Preço do Alibaba é preço de anúncio, não cotação FOB.
         </footer>

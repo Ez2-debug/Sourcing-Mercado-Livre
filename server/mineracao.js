@@ -220,9 +220,11 @@ async function lerSinaisDaCategoria(no) {
       throw err;
     }
   };
+  // Os termos em alta so enriquecem a triagem: limite (429) ou falha neles nao
+  // derruba a mineracao da categoria; o ranking continua obrigatorio.
   const [destaques, tendencias] = await Promise.all([
     tolerante(`/highlights/${siteDoId(no.id)}/category/${no.id}`),
-    tolerante(`/trends/${siteDoId(no.id)}/${no.id}`),
+    apiGet(`/trends/${siteDoId(no.id)}/${no.id}`).catch(() => null),
   ]);
   no.ranking = destaques && Array.isArray(destaques.content) ? destaques.content : [];
   no.termos_em_alta = Array.isArray(tendencias) ? tendencias.map((t) => t.keyword).filter(Boolean) : [];

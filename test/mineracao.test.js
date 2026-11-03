@@ -898,3 +898,14 @@ test('mais vendidos: genero pelo titulo, origem pelo vendedor e grupos por categ
   assert.equal(mv.itens.find((x) => x.id === 'MLB901').genero, 'Feminino');
   assert.equal(mv.itens.find((x) => x.id === 'MLB901').marca, undefined, 'GENERIC nao e marca');
 });
+
+test('telas antigas leem a busca nova quando ela e mais recente', () => {
+  const { gravarMaisVendidos } = require('../server/maisvendidos');
+  const colunas = ['itemId', 'sellerId', 'title', 'price', 'sellerName', 'brand', 'categoryL1Name', 'categoryL2Name', 'isInternational', 'itemSales1m', 'itemRevenue1m', 'imageUrl', 'shopeeUrl'];
+  gravarMaisVendidos('shopee', JSON.stringify({ columns: colunas, data: [[777, 1, 'Pijama Infantil Dinossauro', 43, 'Loja X', null, 'Moda Infantil', 'Pijamas', true, 50000, 2150000, null, 'https://shopee.com.br/product/1/777']] }), new Date('2099-01-01T00:00:00Z'));
+  const s = require('../server/shopee').lerShopee();
+  assert.equal(s.consultado_em, '2099-01-01T00:00:00.000Z');
+  assert.equal(s.itens[0].nome, 'Pijama Infantil Dinossauro');
+  assert.equal(s.itens[0].vendas_30_dias, 50000);
+  assert.equal(s.itens[0].local_da_loja, 'Internacional');
+});

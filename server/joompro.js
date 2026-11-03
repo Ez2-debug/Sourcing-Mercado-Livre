@@ -119,7 +119,28 @@ function gravarJoompro(resposta, agora) {
   return { arquivo, itens: itens.length, lote_pequeno: itens.filter((x) => x.lote_pequeno).length };
 }
 
+// A busca nova do JoomPro (maisvendidos.js) no formato desta tela.
+function daBuscaNova() {
+  const { lerTipo } = require('./maisvendidos');
+  const d = lerTipo('joompro');
+  if (!d) return null;
+  return {
+    fonte: 'JoomPulse (catalogo JoomPro, por vendas do equivalente no ML)', consultado_em: d.consultado_em, aviso: AVISO,
+    itens: d.itens.map((x) => ({
+      id: x.id, titulo: x.titulo_fornecedor || x.titulo, foto: x.foto, categoria: [x.categoria, x.subcategoria].filter(Boolean).join(' > '),
+      custo_no_brasil: x.preco, pedido_minimo: x.pedido_minimo, lote_pequeno: x.lote_pequeno, link: x.link,
+      semelhanca: x.semelhanca, margem: x.margem,
+      mercado_livre: { titulo: x.titulo, categoria: x.categoria, menor_preco: x.preco_ml, link: x.link_ml, pedidos_estimados_no_mes: x.vendas_mes },
+    })),
+  };
+}
+
 function lerJoompro() {
+  const { maisNova } = require('./maisvendidos');
+  return maisNova(lerJoomproAntiga(), daBuscaNova());
+}
+
+function lerJoomproAntiga() {
   let nomes;
   try {
     nomes = fs.readdirSync(pastaJoompro()).filter((n) => /^joompro-\d{4}-\d{2}-\d{2}\.json$/.test(n)).sort();

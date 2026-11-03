@@ -13,6 +13,7 @@
  *   node scripts/claude.js joompro-gravar <arquivo.json>   grava a resposta do JoomPulse
  *   node scripts/claude.js internacional-consulta <ml|ml-us|shopee>  consulta ao JoomPulse do que o Brasil compra de fora
  *   node scripts/claude.js internacional-gravar <ml|ml-us|shopee> <arquivo.json>  grava a resposta
+ *   node scripts/claude.js mais-vendidos-consultas        as 8 buscas de uma atualizacao completa do JoomPulse
  *   node scripts/claude.js mais-vendidos-gravar <tipo> <arquivo.json>  grava uma busca do JoomPulse
  *       tipos: ml, ml-internacional, ml-internacional-itens, shopee, shopee-internacional, joompro
  *   node scripts/claude.js cotacao <id do pacote>          gera as duas planilhas da cotacao
@@ -60,6 +61,9 @@ async function main() {
   if (comando === 'internacional-gravar') {
     const gravado = servidor('internacional').gravarInternacional(resto[0], fs.readFileSync(resto[1], 'utf8'));
     return { ...gravado, supabase: await servidor('supabase').sincronizarRetratos() };
+  }
+  if (comando === 'mais-vendidos-consultas') {
+    return servidor('maisvendidos').CONSULTAS;
   }
   if (comando === 'mais-vendidos-gravar') {
     const gravado = servidor('maisvendidos').gravarMaisVendidos(resto[0], fs.readFileSync(resto[1], 'utf8'));
